@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reprise, pour reprendre là où tu t'étais arrêté</title>
+  <meta name="description" content="Une app gratuite pour Mac : sauvegarde tes apps, onglets et dossiers ouverts en un raccourci, avec une phrase « où j'en étais », et remets tout en place en un clic.">
+  <link rel="icon" href="icon.png">
+  <style>
+    @font-face { font-family: "Bricolage"; src: url("fonts/BricolageGrotesque.ttf") format("truetype"); font-weight: 200 800; font-stretch: 75% 100%; font-display: swap; }
+    @font-face { font-family: "Atkinson"; src: url("fonts/AtkinsonHyperlegible-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+    @font-face { font-family: "Atkinson"; src: url("fonts/AtkinsonHyperlegible-Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+
+    :root {
+      --paper: #F3F2FA; --surface: #FFFFFF; --ink: #1C1939; --ink-2: #5D5980; --line: #DFDCEF;
+      --ribbon: #4A3ED0; --ribbon-ink: #FFFFFF; --marker: #FFE16B; --marker-ink: #1C1939;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --paper: #12102A; --surface: #1B1838; --ink: #EDECFB; --ink-2: #A9A6CC; --line: #2D2954;
+        --ribbon: #8F84FF; --ribbon-ink: #120F2B; --marker: rgba(255,214,61,.30); --marker-ink: #FFF6CF;
+        color-scheme: dark;
+      }
+    }
+    :root[data-theme="dark"] {
+      --paper: #12102A; --surface: #1B1838; --ink: #EDECFB; --ink-2: #A9A6CC; --line: #2D2954;
+      --ribbon: #8F84FF; --ribbon-ink: #120F2B; --marker: rgba(255,214,61,.30); --marker-ink: #FFF6CF;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 400 1.0625rem/1.6 "Atkinson", -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; }
+    .wrap { max-width: 68rem; margin: 0 auto; padding: 0 1rem; }
+    header.top { display: flex; align-items: center; justify-content: space-between; padding: 1.2rem 0; }
+    .brand { display: flex; align-items: center; gap: .6rem; font: 700 1.2rem "Bricolage", sans-serif; text-decoration: none; }
+    .brand img { width: 2rem; height: 2rem; }
+    .gh { font-weight: 700; font-size: .95rem; text-decoration: none; color: var(--ink-2); }
+    .gh:hover { color: var(--ink); }
+
+    .hero { padding: 3.5rem 0 2.5rem; display: grid; grid-template-columns: auto 1fr; gap: 0 2.5rem; align-items: start; }
+    .sign { width: 4.6rem; height: 6.2rem; color: var(--ink); margin-top: .6rem; }
+    h1 { font: 700 clamp(2.4rem, 6vw, 4.4rem)/1.02 "Bricolage", sans-serif; font-stretch: 88%; letter-spacing: -.025em; margin: 0 0 1.2rem; max-width: 14ch; }
+    .lede { font-size: 1.25rem; color: var(--ink-2); max-width: 36rem; margin: 0 0 1.8rem; }
+    .lede .m { color: var(--marker-ink); background: linear-gradient(100deg, transparent .15em, var(--marker) .35em, var(--marker) calc(100% - .35em), transparent calc(100% - .15em)) 0 70% / 100% 78% no-repeat; padding: 0 .25em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+    .cta { display: flex; flex-wrap: wrap; align-items: center; gap: .8rem 1.2rem; }
+    .btn { display: inline-flex; align-items: center; gap: .6rem; background: var(--ribbon); color: var(--ribbon-ink); text-decoration: none; font-weight: 700; padding: .85rem 1.3rem; border-radius: 12px; }
+    .btn:hover { filter: brightness(1.08); }
+    .fine { font-size: .9rem; color: var(--ink-2); }
+
+    .shot { margin: 1rem 0 4rem; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 30px 70px -30px rgba(28,25,57,.45); background: var(--surface); }
+    .shot img { display: block; width: 100%; height: auto; }
+
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-bottom: 4.5rem; }
+    .step { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 1.5rem; }
+    .step .n { font: 700 2.4rem/1 "Bricolage", sans-serif; color: var(--ribbon); }
+    .step h2 { font: 700 1.25rem/1.25 "Bricolage", sans-serif; margin: .7rem 0 .4rem; }
+    .step p { margin: 0; color: var(--ink-2); }
+    kbd { font: 700 .9em "Atkinson", sans-serif; border: 1px solid currentColor; border-radius: 6px; padding: .05em .4em; }
+
+    .duo { display: grid; grid-template-columns: 1.1fr 1fr; gap: 2.5rem; align-items: center; margin-bottom: 4.5rem; }
+    .duo h2 { font: 700 clamp(1.7rem, 3.5vw, 2.4rem)/1.1 "Bricolage", sans-serif; letter-spacing: -.015em; margin: 0 0 1rem; }
+    .duo ul { padding-left: 1.1rem; margin: 0; color: var(--ink-2); }
+    .duo li { margin: .45rem 0; }
+    .duo li strong { color: var(--ink); }
+    .pics { display: flex; gap: 1rem; align-items: flex-start; }
+    .pics img { border-radius: 12px; border: 1px solid var(--line); box-shadow: 0 20px 50px -25px rgba(28,25,57,.5); height: auto; }
+
+    .install { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 2rem; margin-bottom: 4rem; }
+    .install h2 { font: 700 1.6rem "Bricolage", sans-serif; margin: 0 0 1rem; }
+    .install ol { margin: 0; padding-left: 1.2rem; }
+    .install li { margin: .5rem 0; }
+    code { font: .95em ui-monospace, "SF Mono", Menlo, monospace; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: .1em .4em; }
+    footer { padding: 2rem 0 3rem; color: var(--ink-2); font-size: .92rem; border-top: 1px solid var(--line); }
+
+    @media (max-width: 760px) {
+      .hero { grid-template-columns: 1fr; padding-top: 2rem; }
+      .sign { width: 2.6rem; height: 3.5rem; margin-bottom: 1rem; }
+      .steps, .duo { grid-template-columns: 1fr; }
+      .pics img { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="#"><img src="icon.png" alt="">Reprise</a>
+      <a class="gh" href="https://github.com/RenzVASA/reprise">Code source sur GitHub</a>
+    </header>
+
+    <section class="hero">
+      <svg class="sign" viewBox="0 0 48 64" aria-hidden="true"><rect x="4" y="6" width="11" height="52" rx="2" fill="currentColor"/><rect x="19.5" y="6" width="4" height="52" rx="1.5" fill="currentColor"/><circle cx="35" cy="23" r="5.5" fill="#F2C94C"/><circle cx="35" cy="41" r="5.5" fill="#F2C94C"/></svg>
+      <div>
+        <h1>Reprends là où tu t'étais arrêté.</h1>
+        <p class="lede">Un raccourci sauvegarde tes apps, tes onglets, tes dossiers et tes fichiers ouverts, avec une phrase : <span class="m">où j'en étais</span>. Un clic remet tout en place.</p>
+        <div class="cta">
+          <a class="btn" href="https://github.com/RenzVASA/reprise/releases/latest">Télécharger pour Mac</a>
+          <span class="fine">Gratuit et open source. Mac Apple Silicon, macOS 11 ou plus récent.</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="shot"><img src="screenshots/main_light.png" alt="La fenêtre principale de Reprise, avec un contexte « Exposé d'histoire » et sa note surlignée" width="2160" height="1440"></div>
+
+    <section class="steps" aria-label="Comment ça marche">
+      <div class="step"><div class="n">1</div><h2>Appuie sur <kbd>⌥⌘S</kbd></h2><p>Depuis n'importe quelle app. Reprise photographie ce qui est ouvert.</p></div>
+      <div class="step"><div class="n">2</div><h2>Écris une phrase</h2><p>Ce que tu faisais, la prochaine étape, ce qui bloquait. Entrée, c'est sauvegardé.</p></div>
+      <div class="step"><div class="n">3</div><h2>Clique sur Reprendre</h2><p>Plus tard, tout se rouvre à sa place et ta phrase t'attend sur un post-it.</p></div>
+    </section>
+
+    <section class="duo">
+      <div>
+        <h2>Pensé pour les cerveaux qui sautent d'une tâche à l'autre.</h2>
+        <ul>
+          <li><strong>Un seul geste à retenir</strong>, Entrée pour valider, Échap pour annuler.</li>
+          <li><strong>Des débuts de phrase</strong> pour ne jamais rester devant une page blanche.</li>
+          <li><strong>Tu choisis ce qu'on garde</strong>, et les apps sans rapport (Spotify, Messages…) peuvent être ignorées pour toujours.</li>
+          <li><strong>Polices de lecture</strong> : Atkinson Hyperlegible, Lexend, OpenDyslexic.</li>
+          <li><strong>Faire place nette</strong> : masque tout le reste quand tu reprends.</li>
+          <li><strong>Tout reste sur ton Mac.</strong> Aucun compte, aucun traceur.</li>
+        </ul>
+      </div>
+      <div class="pics">
+        <img src="screenshots/capture.png" alt="La fenêtre de sauvegarde" width="1120" height="1200" style="width:58%">
+        <img src="screenshots/note.png" alt="Le post-it « Tu en étais là »" width="720" height="420" style="width:42%">
+      </div>
+    </section>
+
+    <section class="install" id="installer">
+      <h2>Installer</h2>
+      <ol>
+        <li>Télécharge le fichier <code>.dmg</code> depuis la <a href="https://github.com/RenzVASA/reprise/releases/latest">dernière version</a>.</li>
+        <li>Glisse Reprise dans le dossier Applications.</li>
+        <li>Reprise n'est pas signée par Apple. La première fois, ouvre le Terminal et colle <code>xattr -cr /Applications/Reprise.app</code>, puis lance l'app.</li>
+      </ol>
+    </section>
+
+    <footer>
+      Vibe codée par RenzVASA avec Claude, l'IA d'Anthropic. Licence MIT.
+    </footer>
+  </div>
+</body>
+</html>

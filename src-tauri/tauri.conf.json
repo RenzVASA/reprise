@@ -1,0 +1,84 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Reprise",
+  "version": "1.0.0",
+  "identifier": "io.github.renzvasa.reprise",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Reprise",
+        "url": "index.html",
+        "width": 1080,
+        "height": 720,
+        "minWidth": 780,
+        "minHeight": 540,
+        "visible": false,
+        "center": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      },
+      {
+        "label": "capture",
+        "title": "Sauvegarder le contexte",
+        "url": "capture.html",
+        "width": 560,
+        "height": 600,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "visible": false,
+        "center": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visibleOnAllWorkspaces": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      },
+      {
+        "label": "note",
+        "title": "Tu en étais là",
+        "url": "note.html",
+        "width": 360,
+        "height": 210,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "visible": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visibleOnAllWorkspaces": true,
+        "focus": false,
+        "shadow": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "category": "Productivity",
+    "shortDescription": "Sauvegarde ton contexte de travail, reprends-le en un clic.",
+    "longDescription": "Reprise photographie tes apps, onglets, dossiers et fichiers ouverts avec une note « où j'en étais », puis remet tout en place d'un clic.",
+    "copyright": "© 2026 RenzVASA — licence MIT",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": "-",
+      "entitlements": "./Entitlements.plist"
+    }
+  }
+}

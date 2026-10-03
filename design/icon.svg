@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#3A3190"/>
+      <stop offset="1" stop-color="#18143A"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FFD23F" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#FFD23F" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="drop" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#bg)" filter="url(#drop)"/>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="185.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="2"/>
+  <!-- barre de reprise : barre épaisse, barre fine, deux points -->
+  <rect x="352" y="282" width="96" height="460" rx="14" fill="#F4F2FF"/>
+  <rect x="490" y="282" width="32" height="460" rx="10" fill="#F4F2FF"/>
+  <circle cx="626" cy="427" r="90" fill="url(#glow)"/>
+  <circle cx="626" cy="597" r="90" fill="url(#glow)"/>
+  <circle cx="626" cy="427" r="44" fill="#FFD23F"/>
+  <circle cx="626" cy="597" r="44" fill="#FFD23F"/>
+</svg>

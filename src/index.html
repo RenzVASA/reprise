@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reprise</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/main.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <header class="topbar" data-tauri-drag-region>
+    <div class="brand" data-tauri-drag-region>
+      <span id="brand-mark" class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name" data-tauri-drag-region>Reprise</span>
+    </div>
+    <label class="search">
+      <span class="search-icon" aria-hidden="true"></span>
+      <input id="search" type="search" placeholder="Chercher un contexte, une note, un onglet…" autocomplete="off" spellcheck="false" aria-label="Chercher">
+    </label>
+    <div class="top-actions">
+      <button id="update-pill" class="update-pill" hidden></button>
+      <button id="btn-info" class="btn ghost icon-only" title="Comment marche Reprise" aria-label="Comment marche Reprise"></button>
+      <button id="btn-settings" class="btn ghost icon-only" title="Réglages (⌘,)" aria-label="Réglages"></button>
+      <button id="btn-capture" class="btn primary" title="Photographier ce qui est ouvert maintenant">
+        <span>Sauvegarder maintenant</span><kbd id="kbd-save">⌥⌘S</kbd>
+      </button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <nav id="list" class="list" aria-label="Contextes sauvegardés"></nav>
+    <section id="detail" class="detail" aria-live="polite"></section>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <dialog id="settings" class="sheet" aria-labelledby="settings-title"></dialog>
+  <dialog id="info" class="sheet info" aria-labelledby="info-title"></dialog>
+  <dialog id="update" class="sheet update" aria-labelledby="update-title"></dialog>
+  <dialog id="welcome" class="sheet welcome" aria-labelledby="welcome-title"></dialog>
+</body>
+</html>

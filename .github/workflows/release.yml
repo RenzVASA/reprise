@@ -1,0 +1,59 @@
+# Construit le .dmg pour Mac Apple Silicon et le publie dans une Release GitHub.
+# Se lance tout seul quand tu pousses un tag « v1.0.0 », « v1.1.0 »…
+# ou à la main depuis l'onglet Actions (bouton « Run workflow »).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Installer les dépendances
+        run: npm install
+
+      - name: Tests du cœur Rust
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Construire et publier
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: "Reprise v__VERSION__"
+          releaseBody: |
+            **Pour Mac Apple Silicon (M1, M2, M3, M4…), macOS 11 ou plus récent.**
+
+            1. Télécharge le fichier `.dmg` ci-dessous et ouvre-le.
+            2. Glisse **Reprise** dans le dossier **Applications**.
+            3. Reprise n'est pas signée par Apple (ça coûte 99 $ par an). La première fois, ouvre le Terminal et colle :
+               ```
+               xattr -cr /Applications/Reprise.app
+               ```
+               puis lance Reprise normalement.
+
+            Raccourci par défaut : **⌥⌘S** pour sauvegarder ton contexte, **⌥⌘R** pour ouvrir Reprise.
+          releaseDraft: false
+          prerelease: false
+          args: --target aarch64-apple-darwin

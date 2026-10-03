@@ -1,0 +1,40 @@
+/* Le post-it « Tu en étais là », affiché après une reprise. Toujours jaune, même en mode sombre :
+   c'est un vrai bout de papier collé sur l'écran. */
+
+html, body { height: 100%; overflow: hidden; background: #FFE16B; }
+.postit {
+  height: 100%;
+  display: flex; flex-direction: column;
+  padding: .85rem 1rem .8rem 1.1rem;
+  background: linear-gradient(180deg, #FFE883 0%, #FFE16B 40%, #FBD957 100%);
+  color: #2A2410;
+}
+.postit-head { display: flex; align-items: center; gap: .5rem; }
+.postit-sign { width: .65rem; height: .9rem; color: #2A2410; flex: none; }
+.postit-sign svg { width: 100%; height: 100%; }
+.postit-sign .dot { fill: #2A2410; }
+.postit-kicker { font-family: var(--font-display); font-size: .8rem; font-weight: 700; opacity: .7; }
+.postit-x {
+  margin-left: auto; border: 0; background: transparent; color: inherit; opacity: .55;
+  width: 1.6rem; height: 1.6rem; display: grid; place-items: center; border-radius: 50%;
+}
+.postit-x:hover { opacity: 1; background: rgba(42, 36, 16, .08); }
+.postit-x .icon { width: .9rem; height: .9rem; }
+
+.postit-name {
+  font-family: var(--font-display); font-weight: 700; font-size: 1rem; line-height: 1.25;
+  margin: .45rem 0 .25rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.postit-text {
+  margin: 0; font-size: 1.02rem; line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.postit-foot { margin-top: auto; display: flex; justify-content: flex-end; }
+.postit-go {
+  border: 1.5px solid #2A2410; background: transparent; color: #2A2410;
+  border-radius: 99px; padding: .3em .95em; font-weight: 700; font-size: .85rem;
+}
+.postit-go:hover { background: #2A2410; color: #FFE16B; }
+:focus-visible { outline-color: #2A2410; }

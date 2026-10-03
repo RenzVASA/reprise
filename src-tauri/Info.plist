@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>Reprise lit tes apps, onglets et dossiers ouverts pour les sauvegarder, puis les rouvre quand tu reprends un contexte. Tout reste sur ton Mac.</string>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>fr</string>
+</dict>
+</plist>

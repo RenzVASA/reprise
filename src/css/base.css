@@ -1,0 +1,220 @@
+/* ─────────────────────────────────────────────────────────────
+   Reprise — socle commun aux trois fenêtres
+   Idée visuelle : la barre de reprise des partitions (‖:) et le
+   surligneur jaune qu'on passe sur la phrase « où j'en étais ».
+   ───────────────────────────────────────────────────────────── */
+
+@font-face { font-family: "Bricolage"; src: url("../fonts/BricolageGrotesque.ttf") format("truetype"); font-weight: 200 800; font-stretch: 75% 100%; font-display: swap; }
+@font-face { font-family: "Atkinson"; src: url("../fonts/AtkinsonHyperlegible-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Atkinson"; src: url("../fonts/AtkinsonHyperlegible-Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Atkinson"; src: url("../fonts/AtkinsonHyperlegible-Italic.ttf") format("truetype"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Lexend"; src: url("../fonts/Lexend.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "OpenDyslexic"; src: url("../fonts/OpenDyslexic-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "OpenDyslexic"; src: url("../fonts/OpenDyslexic-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+
+:root {
+  --paper: #F3F2FA;
+  --surface: #FFFFFF;
+  --surface-2: #EAE8F6;
+  --ink: #1C1939;
+  --ink-2: #5D5980;
+  --ink-3: #8C89AC;
+  --line: #DFDCEF;
+  --ribbon: #4A3ED0;
+  --ribbon-hover: #3B30B4;
+  --ribbon-soft: #E3E0FB;
+  --ribbon-ink: #FFFFFF;
+  --marker: #FFE16B;
+  --marker-ink: #1C1939;
+  --danger: #C2334A;
+  --ok: #1F8A5B;
+  --shadow: 0 1px 0 rgba(28, 25, 57, .04), 0 8px 24px -12px rgba(28, 25, 57, .22);
+
+  --font-display: "Bricolage", "Atkinson", -apple-system, system-ui, sans-serif;
+  --font-read: "Atkinson", -apple-system, system-ui, sans-serif;
+  --scale: 1;
+
+  --r-s: 6px;
+  --r-m: 10px;
+  --r-l: 16px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #12102A;
+    --surface: #1B1838;
+    --surface-2: #24204A;
+    --ink: #EDECFB;
+    --ink-2: #A9A6CC;
+    --ink-3: #77739E;
+    --line: #2D2954;
+    --ribbon: #8F84FF;
+    --ribbon-hover: #A59CFF;
+    --ribbon-soft: #2B2660;
+    --ribbon-ink: #120F2B;
+    --marker: rgba(255, 214, 61, .30);
+    --marker-ink: #FFF6CF;
+    --danger: #FF6F86;
+    --ok: #4FD69C;
+    --shadow: 0 1px 0 rgba(0, 0, 0, .2), 0 10px 30px -12px rgba(0, 0, 0, .6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #12102A;
+  --surface: #1B1838;
+  --surface-2: #24204A;
+  --ink: #EDECFB;
+  --ink-2: #A9A6CC;
+  --ink-3: #77739E;
+  --line: #2D2954;
+  --ribbon: #8F84FF;
+  --ribbon-hover: #A59CFF;
+  --ribbon-soft: #2B2660;
+  --ribbon-ink: #120F2B;
+  --marker: rgba(255, 214, 61, .30);
+  --marker-ink: #FFF6CF;
+  --danger: #FF6F86;
+  --ok: #4FD69C;
+  --shadow: 0 1px 0 rgba(0, 0, 0, .2), 0 10px 30px -12px rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
+
+:root[data-font="lexend"] { --font-read: "Lexend", -apple-system, system-ui, sans-serif; }
+:root[data-font="system"] { --font-read: -apple-system, system-ui, "Helvetica Neue", sans-serif; }
+:root[data-font="opendyslexic"] {
+  --font-read: "OpenDyslexic", "Atkinson", sans-serif;
+  --font-display: "OpenDyslexic", "Atkinson", sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { font-size: calc(16px * var(--scale)); -webkit-font-smoothing: antialiased; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-read);
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-select: text; cursor: text; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+img, svg { display: block; }
+[hidden] { display: none !important; }
+
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--ribbon); outline-offset: 2px; border-radius: var(--r-s); }
+
+.icon { width: 1.1em; height: 1.1em; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ── Boutons ─────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: .5em;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  padding: .55em .95em;
+  border-radius: var(--r-m);
+  font-weight: 700;
+  font-size: .9rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background-color .12s, border-color .12s, transform .08s;
+}
+.btn:hover { border-color: var(--ink-3); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: default; transform: none; }
+.btn.primary { background: var(--ribbon); border-color: var(--ribbon); color: var(--ribbon-ink); }
+.btn.primary:hover { background: var(--ribbon-hover); border-color: var(--ribbon-hover); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--ink-2); }
+.btn.ghost:hover { background: var(--surface-2); color: var(--ink); }
+.btn.danger { color: var(--danger); }
+.btn.icon-only { padding: .5em; }
+
+kbd {
+  font-family: var(--font-read);
+  font-size: .78em;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: .12em .45em;
+  border-radius: 5px;
+  border: 1px solid currentColor;
+  opacity: .75;
+}
+
+/* ── Champs ──────────────────────────────────────────────── */
+.field {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  padding: .6em .8em;
+  transition: border-color .12s, box-shadow .12s;
+}
+.field::placeholder { color: var(--ink-3); }
+.field:focus { border-color: var(--ribbon); box-shadow: 0 0 0 3px var(--ribbon-soft); }
+
+/* ── Le surligneur : la signature de Reprise ─────────────── */
+.marker {
+  color: var(--marker-ink);
+  background-image: linear-gradient(100deg,
+    transparent .15em,
+    var(--marker) .35em,
+    var(--marker) calc(100% - .35em),
+    transparent calc(100% - .15em));
+  background-size: 100% 78%;
+  background-position: 0 70%;
+  background-repeat: no-repeat;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  padding: 0 .3em;
+  border-radius: .25em .5em .35em .6em;
+}
+
+/* ── Interrupteurs ───────────────────────────────────────── */
+.switch { position: relative; display: inline-flex; align-items: center; gap: .7em; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch .track {
+  width: 2.3em; height: 1.35em; border-radius: 1em; flex: none;
+  background: var(--surface-2); border: 1px solid var(--line);
+  position: relative; transition: background-color .15s, border-color .15s;
+}
+.switch .track::after {
+  content: ""; position: absolute; top: .12em; left: .14em;
+  width: 1em; height: 1em; border-radius: 50%;
+  background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.25);
+  transition: transform .15s;
+}
+.switch input:checked + .track { background: var(--ribbon); border-color: var(--ribbon); }
+.switch input:checked + .track::after { transform: translateX(.92em); }
+.switch input:focus-visible + .track { outline: 2px solid var(--ribbon); outline-offset: 2px; }
+
+/* ── Petits éléments ─────────────────────────────────────── */
+.chip {
+  display: inline-flex; align-items: center; gap: .35em;
+  font-size: .82rem; font-weight: 700;
+  padding: .25em .6em; border-radius: 99px;
+  background: var(--surface-2); color: var(--ink-2);
+}
+.muted { color: var(--ink-2); }
+.small { font-size: .85rem; }
+
+.spinner {
+  width: .9em; height: .9em; border-radius: 50%;
+  border: 2px solid var(--ribbon-soft); border-top-color: var(--ribbon);
+  animation: spin .8s linear infinite; flex: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Zone qu'on peut attraper pour déplacer la fenêtre (barre de titre transparente). */
+.drag { -webkit-app-region: drag; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

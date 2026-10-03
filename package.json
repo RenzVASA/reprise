@@ -1,0 +1,16 @@
+{
+  "name": "reprise",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sauvegarde ton contexte de travail en un raccourci, reprends-le en un clic.",
+  "license": "MIT",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "apercu": "python3 -m http.server 8765 -d src"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

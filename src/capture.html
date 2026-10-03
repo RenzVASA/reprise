@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sauvegarder le contexte</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/capture.css">
+  <script type="module" src="js/capture.js"></script>
+</head>
+<body>
+  <div class="drag-strip" data-tauri-drag-region></div>
+  <main class="cap">
+    <div class="cap-head" data-tauri-drag-region>
+      <span id="cap-sign" class="cap-sign" aria-hidden="true"></span>
+      <div data-tauri-drag-region>
+        <h1 id="cap-title" data-tauri-drag-region>Sauvegarder ce contexte</h1>
+        <p id="cap-sub" class="cap-sub" data-tauri-drag-region>Photo de ce qui est ouvert…</p>
+      </div>
+    </div>
+
+    <label class="cap-label" for="note">Où tu en es ?</label>
+    <div class="note-wrap">
+      <textarea id="note" class="field cap-note" rows="3" spellcheck="true"
+        placeholder="Ex. : il reste la conclusion, les sources sont dans l'onglet Lumni."></textarea>
+    </div>
+    <div class="starters" id="starters" aria-label="Débuts de phrase">
+      <button type="button" class="starter">Je venais de </button>
+      <button type="button" class="starter">Prochaine étape : </button>
+      <button type="button" class="starter">Je bloque sur </button>
+      <button type="button" class="starter">Ne pas oublier : </button>
+    </div>
+
+    <label class="cap-label" for="name">Nom</label>
+    <input id="name" class="field cap-name" type="text" autocomplete="off" spellcheck="false">
+
+    <div id="preview" class="cap-preview"></div>
+    <div id="pick" class="pick" hidden></div>
+    <div id="warn" class="cap-warn" hidden></div>
+
+    <footer class="cap-foot">
+      <button id="cancel" class="btn ghost" type="button">Annuler <kbd>esc</kbd></button>
+      <button id="save" class="btn primary" type="button">Sauvegarder <kbd>↵</kbd></button>
+    </footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,84 @@
+/* Petite fenêtre de sauvegarde (⌥⌘S). Elle doit se remplir en trois secondes. */
+
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--surface); }
+.drag-strip { position: fixed; inset: 0 0 auto 0; height: 28px; z-index: 0; }
+
+.cap { position: relative; height: 100%; display: flex; flex-direction: column; padding: 2rem 1.6rem 1rem; }
+
+.cap-head { display: flex; align-items: center; gap: .9rem; margin-bottom: 1.1rem; }
+.cap-sign { width: 1.25rem; height: 1.7rem; color: var(--ink); flex: none; }
+.cap-sign svg { width: 100%; height: 100%; }
+.cap-sign .dot { fill: #F2C94C; }
+.cap-head h1 { font-family: var(--font-display); font-size: 1.35rem; line-height: 1.2; margin: 0; letter-spacing: -.01em; }
+.cap-sub { margin: .1rem 0 0; font-size: .85rem; color: var(--ink-2); }
+
+.cap-label { font-family: var(--font-display); font-weight: 700; font-size: .85rem; color: var(--ink-2); margin: 0 0 .35rem; }
+
+/* La note est saisie sur du « papier surligné » : on écrit directement au surligneur. */
+.cap-note {
+  resize: none;
+  font-size: 1.12rem; line-height: 1.55;
+  background: var(--surface-2);
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--marker) 38%, var(--surface));
+  border-color: color-mix(in srgb, var(--marker) 70%, var(--line));
+  color: var(--ink);
+}
+.cap-note:focus { border-color: var(--ribbon); }
+
+.starters { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0 .8rem; }
+.starter {
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink-2);
+  border-radius: 99px; padding: .22em .7em; font-size: .8rem; font-weight: 700;
+}
+.starter:hover { color: var(--ink); border-color: var(--ink-3); }
+
+.cap-name { font-weight: 700; }
+
+.cap-preview { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-top: .9rem; min-height: 1.8rem; font-size: .85rem; color: var(--ink-2); }
+.cap-preview .chip .icon { width: .95em; height: .95em; }
+.cap-warn {
+  margin-top: .6rem; font-size: .8rem; line-height: 1.4; color: var(--ink-2);
+  display: flex; gap: .5rem; align-items: flex-start;
+}
+.cap-warn > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cap-warn .icon { color: var(--danger); margin-top: .1rem; }
+.cap-warn button { margin-left: auto; flex: none; padding: .25em .6em; font-size: .78rem; }
+
+.cap-foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding-top: .8rem; }
+.cap-foot .btn.primary kbd { border-color: rgba(255,255,255,.55); }
+.cap-foot .waiting { font-size: .85rem; color: var(--ink-2); display: inline-flex; align-items: center; gap: .5rem; }
+
+/* ── Choisir ce qu'on garde ─────────────────────────────── */
+.pick-chip { border: 1px solid transparent; cursor: pointer; }
+.pick-chip:hover { border-color: var(--line); color: var(--ink); }
+.pick-chip.open { background: var(--ribbon-soft); color: var(--ribbon); }
+.pick-chip.partial { border-color: var(--ribbon); border-style: dashed; }
+.pick-chip .chev { width: .4em; height: .4em; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translate(-1px, -1px); margin-left: .15em; }
+.pick-chip.open .chev { transform: rotate(-135deg) translate(-1px, -1px); }
+.pick-hint { font-size: .78rem; color: var(--ink-3); }
+
+.pick { margin-top: .5rem; border: 1px solid var(--line); border-radius: var(--r-m); background: var(--surface); overflow: hidden; }
+.pick-head { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .45rem .75rem; font-size: .8rem; color: var(--ink-2); background: var(--paper); border-bottom: 1px solid var(--line); }
+.pick-list { list-style: none; margin: 0; padding: 0; max-height: 8.6rem; overflow-y: auto; }
+.pick-list li { display: flex; align-items: center; gap: .6rem; padding: .35rem .75rem; border-top: 1px solid var(--line); }
+.pick-list li:first-child { border-top: 0; }
+.pick-list li.off .pick-text { opacity: .45; text-decoration: line-through; text-decoration-color: var(--ink-3); }
+.pick-list label { display: flex; align-items: center; gap: .6rem; flex: 1; min-width: 0; cursor: pointer; }
+.pick-list input[type="checkbox"] { accent-color: var(--ribbon); width: .95rem; height: .95rem; flex: none; }
+.pick-text { display: flex; flex-direction: column; min-width: 0; }
+.pick-title { font-size: .86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick-sub { font-size: .74rem; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.link { border: 0; background: none; padding: .15rem .3rem; border-radius: var(--r-s); font-size: .78rem; font-weight: 700; color: var(--ribbon); white-space: nowrap; }
+.link:hover { background: var(--ribbon-soft); }
+.link.quiet { color: var(--ink-3); font-weight: 400; }
+.link.quiet:hover { color: var(--danger); background: transparent; text-decoration: underline; }
+
+/* Quand le panneau de choix est ouvert, il prend la place libre et la note se fait plus petite. */
+.cap > * { flex-shrink: 0; }
+.cap > .pick { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.pick-list { min-height: 0; }
+body.picking .starters { display: none; }
+body.picking .cap-note { height: 4.4rem; }
+body.picking .cap-label[for="name"] { margin-top: .7rem; }
