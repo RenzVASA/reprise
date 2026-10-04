@@ -82,3 +82,9 @@ body { background: var(--surface); }
 body.picking .starters { display: none; }
 body.picking .cap-note { height: 4.4rem; }
 body.picking .cap-label[for="name"] { margin-top: .7rem; }
+
+/* Astuce de la première sauvegarde. */
+.tip { display: flex; align-items: flex-start; gap: .6rem; margin: -.3rem 0 .9rem; padding: .6rem .75rem; border-radius: var(--r-m); background: var(--ribbon-soft); color: var(--ink); font-size: .82rem; line-height: 1.45; }
+.tip p { margin: 0; }
+.tip .link { flex: none; margin-top: -.1rem; }
+body.has-tip .starters { display: none; }

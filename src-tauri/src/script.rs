@@ -3,6 +3,7 @@
 //! (séparateur de champ 0x1F, séparateur d'enregistrement 0x1E) pour ne jamais
 //! se faire piéger par une virgule ou un retour à la ligne dans un titre d'onglet.
 
+use crate::model::Frame;
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -169,7 +170,7 @@ pub const APPS: &str = r#"on run argv
 	return out
 end run"#;
 
-/// Onglets de Safari. Champs : n° de fenêtre, URL, titre.
+/// Onglets de Safari. Champs : n° de fenêtre, URL, titre, cadre de la fenêtre « x,y,l,h ».
 const SAFARI_TABS: &str = r#"on run argv
 	set US to character id 31
 	set RS to character id 30
@@ -179,13 +180,18 @@ const SAFARI_TABS: &str = r#"on run argv
 		repeat with w in windows
 			set wi to wi + 1
 			try
+				set bd to ""
+				try
+					set b to bounds of w
+					set bd to ((item 1 of b) as text) & "," & ((item 2 of b) as text) & "," & (((item 3 of b) - (item 1 of b)) as text) & "," & (((item 4 of b) - (item 2 of b)) as text)
+				end try
 				repeat with t in tabs of w
 					try
 						set u to URL of t
 						if u is not missing value then
 							set ti to name of t
 							if ti is missing value then set ti to u
-							set out to out & wi & US & u & US & ti & RS
+							set out to out & wi & US & u & US & ti & US & bd & RS
 						end if
 					end try
 				end repeat
@@ -195,7 +201,7 @@ const SAFARI_TABS: &str = r#"on run argv
 	return out
 end run"#;
 
-/// Onglets des navigateurs Chromium (Chrome, Brave, Edge, Arc, Vivaldi…).
+/// Onglets des navigateurs Chromium (Chrome, Brave, Edge, Arc, Vivaldi…). Mêmes champs.
 const CHROMIUM_TABS: &str = r#"on run argv
 	set US to character id 31
 	set RS to character id 30
@@ -205,13 +211,18 @@ const CHROMIUM_TABS: &str = r#"on run argv
 		repeat with w in windows
 			set wi to wi + 1
 			try
+				set bd to ""
+				try
+					set b to bounds of w
+					set bd to ((item 1 of b) as text) & "," & ((item 2 of b) as text) & "," & (((item 3 of b) - (item 1 of b)) as text) & "," & (((item 4 of b) - (item 2 of b)) as text)
+				end try
 				repeat with t in tabs of w
 					try
 						set u to URL of t
 						if u is not missing value then
 							set ti to title of t
 							if ti is missing value then set ti to u
-							set out to out & wi & US & u & US & ti & RS
+							set out to out & wi & US & u & US & ti & US & bd & RS
 						end if
 					end try
 				end repeat
@@ -221,26 +232,31 @@ const CHROMIUM_TABS: &str = r#"on run argv
 	return out
 end run"#;
 
-/// Dossiers ouverts dans le Finder (chemins POSIX).
+/// Dossiers ouverts dans le Finder. Champs : chemin POSIX, cadre « x,y,l,h ».
 pub const FINDER_FOLDERS: &str = r#"on run argv
+	set US to character id 31
 	set RS to character id 30
 	set out to ""
 	tell application "Finder"
 		repeat with w in Finder windows
 			try
 				set p to POSIX path of (target of w as alias)
-				set out to out & p & RS
+				set bd to ""
+				try
+					set b to bounds of w
+					set bd to ((item 1 of b) as text) & "," & ((item 2 of b) as text) & "," & (((item 3 of b) - (item 1 of b)) as text) & "," & (((item 4 of b) - (item 2 of b)) as text)
+				end try
+				set out to out & p & US & bd & RS
 			end try
 		end repeat
 	end tell
 	return out
 end run"#;
 
-/// Fichiers ouverts, lus via l'attribut d'accessibilité AXDocument de chaque fenêtre.
-/// Marche avec Aperçu, TextEdit, Pages, Keynote, Xcode, VS Code et beaucoup d'autres.
-/// Renvoie « !AX » si l'accès Accessibilité n'est pas accordé.
-/// Champs : bundle id, nom affiché, URL du document.
-pub const DOCUMENTS: &str = r#"on run argv
+/// Toutes les fenêtres des apps, lues par l'Accessibilité : le fichier ouvert (AXDocument),
+/// le titre, la position et la taille. Renvoie « !AX » si l'accès Accessibilité manque.
+/// Champs : bundle id, nom de l'app, URL du document, titre, x, y, largeur, hauteur, réduite.
+pub const WINDOWS: &str = r#"on run argv
 	set US to character id 31
 	set RS to character id 30
 	set out to ""
@@ -262,8 +278,23 @@ pub const DOCUMENTS: &str = r#"on run argv
 				if n is missing value or n is "" then set n to name of p
 				repeat with w in (every window of p)
 					try
-						set d to value of attribute "AXDocument" of w
-						if d is not missing value and d is not "" then set out to out & b & US & n & US & d & RS
+						set d to ""
+						try
+							set d to value of attribute "AXDocument" of w
+							if d is missing value then set d to ""
+						end try
+						set t to ""
+						try
+							set t to name of w
+							if t is missing value then set t to ""
+						end try
+						set mn to false
+						try
+							set mn to value of attribute "AXMinimized" of w
+						end try
+						set ps to position of w
+						set sz to size of w
+						set out to out & b & US & n & US & d & US & t & US & ((item 1 of ps) as text) & US & ((item 2 of ps) as text) & US & ((item 1 of sz) as text) & US & ((item 2 of sz) as text) & US & (mn as text) & RS
 					end try
 				end repeat
 			end try
@@ -274,28 +305,109 @@ end run"#;
 
 // ──────────────────────────── Scripts de restauration ───────────────────────────
 
-/// Ouvre une nouvelle fenêtre Safari avec les URL passées en arguments.
+/// Ouvre une nouvelle fenêtre Safari. Argument 1 : cadre « x,y,l,h » ou vide ; puis les URL.
 const SAFARI_OPEN: &str = r#"on run argv
 	tell application id "__BUNDLE__"
-		make new document with properties {URL:(item 1 of argv)}
+		make new document with properties {URL:(item 2 of argv)}
 		set w to front window
-		repeat with i from 2 to count of argv
+		repeat with i from 3 to count of argv
 			tell w to make new tab at end of tabs with properties {URL:(item i of argv)}
 		end repeat
+		if (item 1 of argv) is not "" then
+			try
+				set AppleScript's text item delimiters to ","
+				set f to text items of (item 1 of argv)
+				set AppleScript's text item delimiters to ""
+				set x to (item 1 of f) as integer
+				set y to (item 2 of f) as integer
+				set bounds of w to {x, y, x + ((item 3 of f) as integer), y + ((item 4 of f) as integer)}
+			end try
+		end if
 		activate
 	end tell
 end run"#;
 
-/// Ouvre une nouvelle fenêtre Chromium avec les URL passées en arguments.
+/// Ouvre une nouvelle fenêtre Chromium. Mêmes arguments.
 const CHROMIUM_OPEN: &str = r#"on run argv
 	tell application id "__BUNDLE__"
 		set w to make new window
-		set URL of active tab of w to (item 1 of argv)
-		repeat with i from 2 to count of argv
+		set URL of active tab of w to (item 2 of argv)
+		repeat with i from 3 to count of argv
 			tell w to make new tab with properties {URL:(item i of argv)}
 		end repeat
+		if (item 1 of argv) is not "" then
+			try
+				set AppleScript's text item delimiters to ","
+				set f to text items of (item 1 of argv)
+				set AppleScript's text item delimiters to ""
+				set x to (item 1 of f) as integer
+				set y to (item 2 of f) as integer
+				set bounds of w to {x, y, x + ((item 3 of f) as integer), y + ((item 4 of f) as integer)}
+			end try
+		end if
 		activate
 	end tell
+end run"#;
+
+/// Ouvre un dossier dans une nouvelle fenêtre du Finder, à sa place.
+/// Arguments : chemin POSIX, cadre « x,y,l,h » ou vide.
+pub const FINDER_OPEN: &str = r#"on run argv
+	set p to (POSIX file (item 1 of argv)) as alias
+	tell application "Finder"
+		set w to make new Finder window
+		set target of w to p
+		if (item 2 of argv) is not "" then
+			try
+				set AppleScript's text item delimiters to ","
+				set f to text items of (item 2 of argv)
+				set AppleScript's text item delimiters to ""
+				set x to (item 1 of f) as integer
+				set y to (item 2 of f) as integer
+				set bounds of w to {x, y, x + ((item 3 of f) as integer), y + ((item 4 of f) as integer)}
+			end try
+		end if
+		activate
+	end tell
+end run"#;
+
+/// Remet les fenêtres d'une app à leur place (Accessibilité).
+/// Arguments : bundle id, puis par fenêtre : titre, x, y, largeur, hauteur.
+/// Une fenêtre est retrouvée par son titre ; s'il n'y en a qu'une de chaque côté, on la prend.
+/// Renvoie le nombre de fenêtres replacées.
+pub const PLACE_WINDOWS: &str = r#"on run argv
+	set b to item 1 of argv
+	set total to ((count of argv) - 1) div 5
+	set placed to 0
+	tell application "System Events"
+		set ps to (every application process whose bundle identifier is b)
+		if (count of ps) is 0 then return "0"
+		set p to item 1 of ps
+		set wc to count of windows of p
+		set i to 2
+		repeat while (i + 4) is less than or equal to (count of argv)
+			set t to item i of argv
+			set target to missing value
+			if t is not "" then
+				try
+					set target to (first window of p whose name is t)
+				end try
+			end if
+			if target is missing value and total is 1 and wc is 1 then
+				try
+					set target to window 1 of p
+				end try
+			end if
+			if target is not missing value then
+				try
+					set position of target to {(item (i + 1) of argv) as integer, (item (i + 2) of argv) as integer}
+					set size of target to {(item (i + 3) of argv) as integer, (item (i + 4) of argv) as integer}
+					set placed to placed + 1
+				end try
+			end if
+			set i to i + 5
+		end repeat
+	end tell
+	return placed as text
 end run"#;
 
 /// Masque toutes les apps visibles sauf celle dont le bundle id est passé en argument.
@@ -421,6 +533,17 @@ pub struct RawTab {
     pub window: u32,
     pub url: String,
     pub title: String,
+    pub frame: Option<Frame>,
+}
+
+/// "x,y,l,h" → cadre (titre vide).
+pub fn parse_frame(s: &str) -> Option<Frame> {
+    let n: Vec<i32> = s.split(',').map(|p| p.trim().parse::<i32>()).collect::<Result<_, _>>().ok()?;
+    if n.len() != 4 {
+        return None;
+    }
+    let f = Frame { title: String::new(), x: n[0], y: n[1], w: n[2], h: n[3] };
+    f.is_usable().then_some(f)
 }
 
 pub fn parse_tabs(out: &str) -> Vec<RawTab> {
@@ -437,7 +560,8 @@ pub fn parse_tabs(out: &str) -> Vec<RawTab> {
                 return None;
             }
             let title = if title.is_empty() { url.clone() } else { title };
-            Some(RawTab { window, url, title })
+            let frame = f.get(3).and_then(|s| parse_frame(s));
+            Some(RawTab { window, url, title, frame })
         })
         .collect()
 }
@@ -449,28 +573,36 @@ pub fn is_reopenable_url(url: &str) -> bool {
     u.starts_with("http://") || u.starts_with("https://") || u.starts_with("file://")
 }
 
-pub fn parse_folders(out: &str) -> Vec<String> {
+pub fn parse_folders(out: &str) -> Vec<(String, Option<Frame>)> {
     records(out)
         .into_iter()
-        .filter_map(|f| f.into_iter().next())
-        .map(|p| p.trim().to_string())
-        .filter(|p| p.starts_with('/'))
+        .filter_map(|f| {
+            let path = f.first()?.trim().to_string();
+            if !path.starts_with('/') {
+                return None;
+            }
+            let frame = f.get(1).and_then(|s| parse_frame(s));
+            Some((path, frame))
+        })
         .collect()
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct RawDocument {
+pub struct RawWindow {
     pub bundle_id: Option<String>,
     pub app_name: String,
-    pub path: String,
+    /// Chemin du fichier affiché dans la fenêtre, s'il y en a un.
+    pub document: Option<String>,
+    /// Cadre de la fenêtre (avec son titre), sauf si elle est réduite ou minuscule.
+    pub frame: Option<Frame>,
 }
 
-/// Renvoie les documents trouvés, et `true` si l'accès Accessibilité manque.
-pub fn parse_documents(out: &str) -> (Vec<RawDocument>, bool) {
+/// Renvoie les fenêtres trouvées, et `true` si l'accès Accessibilité manque.
+pub fn parse_windows(out: &str) -> (Vec<RawWindow>, bool) {
     if out.trim_start().starts_with("!AX") {
         return (Vec::new(), true);
     }
-    let docs = records(out)
+    let wins = records(out)
         .into_iter()
         .filter_map(|f| {
             if f.len() < 3 {
@@ -478,11 +610,20 @@ pub fn parse_documents(out: &str) -> (Vec<RawDocument>, bool) {
             }
             let bundle_id = Some(f[0].trim().to_string()).filter(|b| !b.is_empty());
             let app_name = f[1].trim().to_string();
-            let path = file_url_to_path(f[2].trim())?;
-            Some(RawDocument { bundle_id, app_name, path })
+            let document = file_url_to_path(f[2].trim());
+            let title = f.get(3).map(|t| t.trim().to_string()).unwrap_or_default();
+            let num = |i: usize| f.get(i).and_then(|v| v.trim().parse::<i32>().ok());
+            let minimized = f.get(8).map(|m| m.trim() == "true").unwrap_or(false);
+            let frame = match (num(4), num(5), num(6), num(7)) {
+                (Some(x), Some(y), Some(w), Some(h)) if !minimized => {
+                    Some(Frame { title, x, y, w, h }).filter(|fr| fr.is_usable())
+                }
+                _ => None,
+            };
+            Some(RawWindow { bundle_id, app_name, document, frame })
         })
         .collect();
-    (docs, false)
+    (wins, false)
 }
 
 /// `file:///Users/moi/Mon%20Doc.txt` → `/Users/moi/Mon Doc.txt`.
@@ -567,25 +708,37 @@ mod tests {
     fn tabs_keep_titles_with_commas_and_skip_internal_pages() {
         let out = format!(
             "{}{}{}\n",
-            rec(&["1", "https://example.com/a?b=1,2", "Titre, avec virgule"]),
+            rec(&["1", "https://example.com/a?b=1,2", "Titre, avec virgule", "0,25,1280,800"]),
             rec(&["1", "about:blank", "Nouvel onglet"]),
             rec(&["2", "https://rust-lang.org", ""])
         );
         let tabs = parse_tabs(&out);
         assert_eq!(tabs.len(), 2);
         assert_eq!(tabs[0].title, "Titre, avec virgule");
+        assert_eq!(tabs[0].frame.as_ref().map(|f| (f.y, f.w)), Some((25, 1280)));
+        assert!(tabs[1].frame.is_none());
         assert_eq!(tabs[1].window, 2);
         assert_eq!(tabs[1].title, "https://rust-lang.org");
     }
 
     #[test]
-    fn documents_and_ax_flag() {
-        let (docs, denied) = parse_documents("!AX");
-        assert!(docs.is_empty() && denied);
-        let out = rec(&["com.apple.Preview", "Aperçu", "file:///Users/moi/Mes%20cours/chap%C3%AEtre%201.pdf"]);
-        let (docs, denied) = parse_documents(&out);
+    fn windows_and_ax_flag() {
+        let (w, denied) = parse_windows("!AX");
+        assert!(w.is_empty() && denied);
+        let out = format!(
+            "{}{}{}",
+            rec(&["com.apple.Preview", "Aperçu", "file:///Users/moi/Mes%20cours/chap%C3%AEtre%201.pdf", "chapître 1.pdf", "40", "60", "900", "700", "false"]),
+            rec(&["com.apple.Notes", "Notes", "", "Notes", "-1200", "30", "600", "500", "false"]),
+            rec(&["com.apple.TextEdit", "TextEdit", "", "Sans titre", "0", "0", "500", "400", "true"])
+        );
+        let (w, denied) = parse_windows(&out);
         assert!(!denied);
-        assert_eq!(docs[0].path, "/Users/moi/Mes cours/chapître 1.pdf");
+        assert_eq!(w.len(), 3);
+        assert_eq!(w[0].document.as_deref(), Some("/Users/moi/Mes cours/chapître 1.pdf"));
+        assert_eq!(w[0].frame.as_ref().unwrap().title, "chapître 1.pdf");
+        assert_eq!(w[1].document, None);
+        assert_eq!(w[1].frame.as_ref().unwrap().x, -1200);
+        assert!(w[2].frame.is_none(), "une fenêtre réduite n'a pas de cadre");
     }
 
     #[test]
@@ -601,8 +754,11 @@ mod tests {
 
     #[test]
     fn folders() {
-        let out = format!("/Users/moi/Projets/{RS}/Applications/{RS}");
-        assert_eq!(parse_folders(&out), vec!["/Users/moi/Projets/", "/Applications/"]);
+        let out = format!("/Users/moi/Projets/{US}10,20,800,500{RS}/Applications/{RS}");
+        let f = parse_folders(&out);
+        assert_eq!(f[0].0, "/Users/moi/Projets/");
+        assert_eq!(f[0].1.as_ref().unwrap().w, 800);
+        assert_eq!(f[1], ("/Applications/".to_string(), None));
     }
 
     #[test]

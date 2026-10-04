@@ -1,6 +1,9 @@
-# Construit le .dmg pour Mac Apple Silicon et le publie dans une Release GitHub.
-# Se lance tout seul quand tu pousses un tag « v1.0.0 », « v1.1.0 »…
-# ou à la main depuis l'onglet Actions (bouton « Run workflow »).
+# Construit Reprise pour Mac Apple Silicon et publie la Release :
+#   - le .dmg pour une première installation, avec son empreinte SHA-256 ;
+#   - l'archive de mise à jour signée et le fichier latest.json, que Reprise lit pour
+#     se mettre à jour toute seule ;
+#   - une preuve de provenance signée par GitHub.
+# Se lance quand tu pousses un tag « v1.1.0 », « v1.2.0 »… ou à la main (onglet Actions).
 name: Release
 
 on:
@@ -9,7 +12,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write      # créer la Release et y déposer les fichiers
+  id-token: write      # signer l'attestation de provenance
+  attestations: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   macos:
@@ -29,31 +38,122 @@ jobs:
         with:
           workspaces: "./src-tauri -> target"
 
+      - name: Version
+        id: v
+        run: echo "version=$(node -p "require('./src-tauri/tauri.conf.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Vérifier la clé de signature des mises à jour
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::Le secret TAURI_SIGNING_PRIVATE_KEY manque. Lance le script publier-1.1.sh, il le crée."
+            exit 1
+          fi
+          if [ -z "$(node -p "require('./src-tauri/tauri.conf.json').plugins.updater.pubkey")" ]; then
+            echo "::error::La clé publique manque dans tauri.conf.json. Lance le script publier-1.1.sh."
+            exit 1
+          fi
+
       - name: Installer les dépendances
         run: npm install
 
       - name: Tests du cœur Rust
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
-      - name: Construire et publier
+      - name: Construire l'app, le .dmg et la mise à jour signée
         uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__
-          releaseName: "Reprise v__VERSION__"
-          releaseBody: |
-            **Pour Mac Apple Silicon (M1, M2, M3, M4…), macOS 11 ou plus récent.**
-
-            1. Télécharge le fichier `.dmg` ci-dessous et ouvre-le.
-            2. Glisse **Reprise** dans le dossier **Applications**.
-            3. Reprise n'est pas signée par Apple (ça coûte 99 $ par an). La première fois, ouvre le Terminal et colle :
-               ```
-               xattr -cr /Applications/Reprise.app
-               ```
-               puis lance Reprise normalement.
-
-            Raccourci par défaut : **⌥⌘S** pour sauvegarder ton contexte, **⌥⌘R** pour ouvrir Reprise.
-          releaseDraft: false
-          prerelease: false
           args: --target aarch64-apple-darwin
+
+      - name: Préparer les fichiers
+        id: files
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          B=src-tauri/target/aarch64-apple-darwin/release/bundle
+          mkdir -p out
+
+          DMG=$(ls "$B"/dmg/*.dmg | head -n 1)
+          DMG_NAME="Reprise_${VERSION}_aarch64.dmg"
+          cp "$DMG" "out/$DMG_NAME"
+          SHA=$(shasum -a 256 "out/$DMG_NAME" | cut -d ' ' -f 1)
+          echo "$SHA  $DMG_NAME" > "out/$DMG_NAME.sha256"
+
+          UPD_NAME="Reprise_${VERSION}_aarch64.app.tar.gz"
+          cp "$B/macos/Reprise.app.tar.gz" "out/$UPD_NAME"
+          SIG=$(cat "$B/macos/Reprise.app.tar.gz.sig")
+
+          # Les nouveautés : la section de cette version dans CHANGELOG.md.
+          awk -v v="## $VERSION" '$0==v {on=1; next} /^## / {on=0} on' CHANGELOG.md | sed '/^[[:space:]]*$/d' > notes.txt
+
+          SIG="$SIG" NAME="$UPD_NAME" node -e '
+            const fs = require("fs");
+            const v = process.env.VERSION;
+            fs.writeFileSync("out/latest.json", JSON.stringify({
+              version: v,
+              notes: fs.readFileSync("notes.txt", "utf8").trim(),
+              pub_date: new Date().toISOString(),
+              platforms: {
+                "darwin-aarch64": {
+                  signature: process.env.SIG,
+                  url: `https://github.com/${process.env.REPO}/releases/download/v${v}/${process.env.NAME}`
+                }
+              }
+            }, null, 2));
+          '
+          cat out/latest.json
+          echo "dmg=out/$DMG_NAME" >> "$GITHUB_OUTPUT"
+          echo "dmg_name=$DMG_NAME" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Signer la provenance du .dmg
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ steps.files.outputs.dmg }}
+
+      - name: Publier la Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.v.outputs.version }}
+          NAME: ${{ steps.files.outputs.dmg_name }}
+          SHA: ${{ steps.files.outputs.sha }}
+        run: |
+          TAG="v$VERSION"
+          {
+            echo "**Pour Mac Apple Silicon (M1, M2, M3, M4…), macOS 11 ou plus récent.**"
+            echo
+            echo "### Nouveautés"
+            cat notes.txt
+            echo
+            echo "### Déjà installée ?"
+            echo "Depuis la version 1.1, Reprise se met à jour toute seule : elle te prévient, tu cliques sur « Mettre à jour », elle redémarre à jour."
+            echo
+            echo "### Première installation"
+            echo "1. Télécharge \`$NAME\` ci-dessous et ouvre-le."
+            echo "2. Glisse **Reprise** dans le dossier **Applications**."
+            echo "3. Reprise n'est pas signée par Apple. La première fois, ouvre le Terminal et colle :"
+            echo '   ```'
+            echo "   xattr -cr /Applications/Reprise.app"
+            echo '   ```'
+            echo
+            echo "### Vérifier que le fichier est authentique"
+            echo "Empreinte SHA-256 officielle de \`$NAME\` :"
+            echo '```'
+            echo "$SHA"
+            echo '```'
+            echo "Dans le Terminal : \`shasum -a 256 ~/Downloads/$NAME\`. Les deux suites de caractères doivent être identiques."
+            echo
+            echo "La provenance est aussi signée par GitHub : \`gh attestation verify ~/Downloads/$NAME -R ${{ github.repository }}\`"
+          } > notes.md
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" out/* --clobber
+            gh release edit "$TAG" --title "Reprise $TAG" --notes-file notes.md --latest
+          else
+            gh release create "$TAG" out/* --target "$GITHUB_SHA" --title "Reprise $TAG" --notes-file notes.md --latest
+          fi

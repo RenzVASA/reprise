@@ -34,6 +34,55 @@ pub struct Item {
     /// Pour les onglets : numéro de la fenêtre du navigateur (pour reconstruire les fenêtres).
     #[serde(default)]
     pub group: Option<u32>,
+    /// Position et taille des fenêtres (une pour un onglet ou un dossier, plusieurs pour une app).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub frames: Vec<Frame>,
+}
+
+/// Une fenêtre à l'écran, en points macOS (origine en haut à gauche de l'écran principal).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Frame {
+    /// Titre de la fenêtre, pour la retrouver (vide pour les navigateurs et le Finder).
+    #[serde(default)]
+    pub title: String,
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+}
+
+impl Frame {
+    /// "x,y,w,h", le format échangé avec les scripts AppleScript.
+    pub fn to_arg(&self) -> String {
+        format!("{},{},{},{}", self.x, self.y, self.w, self.h)
+    }
+
+    /// Une fenêtre trop petite (ou réduite) ne vaut pas la peine d'être replacée.
+    pub fn is_usable(&self) -> bool {
+        self.w >= 80 && self.h >= 60 && self.w < 20000 && self.h < 20000
+    }
+
+    pub fn center(&self) -> (i32, i32) {
+        (self.x + self.w / 2, self.y + self.h / 2)
+    }
+}
+
+/// Un écran, en points.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Screen {
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+}
+
+/// La fenêtre est-elle sur un écran branché ? (Sans liste d'écrans, on fait confiance.)
+pub fn on_screen(f: &Frame, screens: &[Screen]) -> bool {
+    if screens.is_empty() {
+        return true;
+    }
+    let (cx, cy) = f.center();
+    screens.iter().any(|s| cx >= s.x && cx < s.x + s.w && cy >= s.y && cy < s.y + s.h)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -56,6 +105,9 @@ pub struct Context {
     pub front_app: Option<String>,
     #[serde(default)]
     pub items: Vec<Item>,
+    /// Sauvegarde faite toute seule par le filet de sécurité.
+    #[serde(default)]
+    pub auto: bool,
 }
 
 /// Résultat brut d'une capture, avant que l'utilisateur ne lui donne un nom.
@@ -84,6 +136,8 @@ pub struct ContextPatch {
     pub name: Option<String>,
     pub note: Option<String>,
     pub pinned: Option<bool>,
+    /// `Some(false)` : garder une sauvegarde auto comme un contexte normal.
+    pub auto: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -111,6 +165,18 @@ impl Context {
     pub fn count(&self, kind: ItemKind) -> usize {
         self.items.iter().filter(|i| i.kind == kind).count()
     }
+
+    /// Dernière fois qu'on s'est servi de ce contexte.
+    pub fn last_used(&self) -> u64 {
+        self.created_at.max(self.updated_at).max(self.last_restored_at.unwrap_or(0))
+    }
+
+    /// Empreinte du contenu, pour savoir si deux sauvegardes sont identiques.
+    pub fn signature(items: &[Item]) -> Vec<(ItemKind, String)> {
+        let mut v: Vec<(ItemKind, String)> = items.iter().map(|i| (i.kind, i.value.clone())).collect();
+        v.sort_by(|a, b| (a.0 as u8).cmp(&(b.0 as u8)).then(a.1.cmp(&b.1)));
+        v
+    }
 }
 
 /// "v1.10.0" est-elle plus récente que "1.9.2" ? Compare les nombres un par un.
@@ -137,7 +203,22 @@ pub fn version_is_newer(latest: &str, current: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::version_is_newer;
+    use super::*;
+
+    #[test]
+    fn frames_and_screens() {
+        let f = Frame { title: String::new(), x: 100, y: 50, w: 800, h: 600 };
+        assert_eq!(f.to_arg(), "100,50,800,600");
+        assert!(f.is_usable());
+        let main = Screen { x: 0, y: 0, w: 1440, h: 900 };
+        assert!(on_screen(&f, &[main]));
+        let far = Frame { x: 2000, ..f.clone() };
+        assert!(!on_screen(&far, &[main]));
+        let right = Screen { x: 1440, y: 0, w: 1920, h: 1080 };
+        assert!(on_screen(&far, &[main, right]));
+        assert!(on_screen(&far, &[]));
+        assert!(!Frame { w: 10, ..f }.is_usable());
+    }
 
     #[test]
     fn versions() {

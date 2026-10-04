@@ -6,6 +6,7 @@ use std::path::Path;
 
 pub const DEFAULT_SAVE_SHORTCUT: &str = "Alt+Command+S";
 pub const DEFAULT_OPEN_SHORTCUT: &str = "Alt+Command+R";
+pub const DEFAULT_RESUME_SHORTCUT: &str = "Alt+Shift+Command+R";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -14,6 +15,8 @@ pub struct Settings {
     pub shortcut_save: String,
     /// Raccourci global pour ouvrir Reprise.
     pub shortcut_open: String,
+    /// Raccourci global pour reprendre le dernier contexte.
+    pub shortcut_resume: String,
     /// Police de lecture : "atkinson", "lexend", "opendyslexic", "system".
     pub font: String,
     /// Taille du texte en pourcentage (90 à 140).
@@ -36,6 +39,16 @@ pub struct Settings {
     pub check_updates: bool,
     /// Dernière recherche de mise à jour (ms depuis 1970).
     pub last_update_check: u64,
+    /// Filet de sécurité : sauvegarder tout seul quand on s'absente.
+    pub auto_save: bool,
+    /// Proposer de reprendre en revenant après une absence.
+    pub welcome_back: bool,
+    /// Durée d'absence (minutes) avant de proposer de reprendre.
+    pub welcome_minutes: u32,
+    /// Astuces et visites déjà vues (« tour », « capture »…).
+    pub seen: Vec<String>,
+    /// Dernière version lancée, pour montrer les nouveautés après une mise à jour.
+    pub last_version: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -60,6 +73,12 @@ impl Default for Settings {
             ignored_apps: Vec::new(),
             check_updates: true,
             last_update_check: 0,
+            shortcut_resume: DEFAULT_RESUME_SHORTCUT.into(),
+            auto_save: true,
+            welcome_back: true,
+            welcome_minutes: 20,
+            seen: Vec::new(),
+            last_version: String::new(),
         }
     }
 }
@@ -92,6 +111,12 @@ impl Settings {
         if self.shortcut_open.trim().is_empty() {
             self.shortcut_open = DEFAULT_OPEN_SHORTCUT.into();
         }
+        if self.shortcut_resume.trim().is_empty() {
+            self.shortcut_resume = DEFAULT_RESUME_SHORTCUT.into();
+        }
+        self.welcome_minutes = self.welcome_minutes.clamp(5, 240);
+        self.seen.sort();
+        self.seen.dedup();
         let mut seen = std::collections::HashSet::new();
         self.ignored_apps.retain(|a| !a.bundle_id.trim().is_empty() && seen.insert(a.bundle_id.clone()));
         self

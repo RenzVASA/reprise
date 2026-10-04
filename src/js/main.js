@@ -2,6 +2,7 @@
 import { api, on } from "./api.js";
 import { applyPrefs, initPrefs } from "./prefs.js";
 import { esc, icon, repeatSign, ago, when, bucket, domain, hue, initial, prettyShortcut, plural } from "./util.js";
+import { startTour } from "./tour.js";
 
 const $ = (s, el = document) => el.querySelector(s);
 
@@ -24,6 +25,7 @@ const detailEl = $("#detail");
 // ───────────────────────────── Données ─────────────────────────────
 
 async function load() {
+  if (state.touring) return;
   try {
     state.contexts = await api.list();
   } catch (e) {
@@ -46,7 +48,7 @@ function visible() {
   const words = q.split(/\s+/).filter(Boolean);
   return state.contexts
     .filter((c) => !words.length || words.every((w) => haystack(c).includes(w)))
-    .sort((a, b) => (b.pinned - a.pinned) || (b.created_at - a.created_at));
+    .sort((a, b) => (a.auto - b.auto) || (b.pinned - a.pinned) || (a.auto ? b.updated_at - a.updated_at : b.created_at - a.created_at));
 }
 
 const current = () => state.contexts.find((c) => c.id === state.selected) || null;
@@ -74,6 +76,13 @@ function rowHtml(c) {
     k.tab && `<span class="count" title="${plural(k.tab, "onglet", "onglets")}">${icon("tab")}${k.tab}</span>`,
     (k.folder + k.document) && `<span class="count" title="Dossiers et fichiers">${icon("folder")}${k.folder + k.document}</span>`,
   ].filter(Boolean).join("");
+  if (c.auto) {
+    return `
+    <button class="row auto ${c.id === state.selected ? "selected" : ""}" data-id="${esc(c.id)}" aria-current="${c.id === state.selected}">
+      <div class="row-name">${icon("shield")}<span>${esc(when(c.updated_at))}</span></div>
+      <div class="row-meta">${meta}<span class="time">${esc(c.front_app || "")}</span></div>
+    </button>`;
+  }
   return `
     <button class="row ${c.id === state.selected ? "selected" : ""}" data-id="${esc(c.id)}" aria-current="${c.id === state.selected}">
       ${c.pinned ? '<span class="ribbon-flag" title="Épinglé"></span>' : ""}
@@ -97,13 +106,17 @@ function renderList() {
   if (state.query.trim()) {
     html += `<h2 class="group-title">${plural(vis.length, "résultat", "résultats")}</h2>` + vis.map(rowHtml).join("");
   } else {
-    const pinned = vis.filter((c) => c.pinned);
+    const pinned = vis.filter((c) => c.pinned && !c.auto);
     if (pinned.length) html += `<h2 class="group-title">Épinglés</h2>` + pinned.map(rowHtml).join("");
     let last = null;
-    for (const c of vis.filter((c) => !c.pinned)) {
+    for (const c of vis.filter((c) => !c.pinned && !c.auto)) {
       const b = bucket(c.created_at);
       if (b !== last) { html += `<h2 class="group-title">${b}</h2>`; last = b; }
       html += rowHtml(c);
+    }
+    const autos = vis.filter((c) => c.auto);
+    if (autos.length) {
+      html += `<h2 class="group-title safety" title="Reprise sauvegarde toute seule quand tu t'absentes. Elle garde les 3 dernières.">${icon("shield")}Filet de sécurité</h2>` + autos.map(rowHtml).join("");
     }
   }
   listEl.innerHTML = html;
@@ -208,9 +221,22 @@ function renderDetail() {
     }
   }
 
+  if (c.auto) {
+    metaBits.length = 0;
+    metaBits.push(`Sauvegardé automatiquement ${when(c.updated_at)}`);
+    if (c.front_app) metaBits.push(`${c.front_app} au premier plan`);
+  }
+  const autoBanner = c.auto ? `
+      <div class="auto-banner">
+        ${icon("shield")}
+        <p>Reprise a fait cette sauvegarde toute seule pendant ton absence. Elle sera remplacée par les suivantes : garde-la si tu veux la conserver.</p>
+        <button class="btn" data-action="keep">Garder ce contexte</button>
+      </div>` : "";
+
   detailEl.innerHTML = `
     <div class="detail-inner">
-      <h1 class="title" id="title" contenteditable="plaintext-only" spellcheck="false" title="Clique pour renommer">${esc(c.name)}</h1>
+      ${autoBanner}
+      <h1 class="title" id="title" contenteditable="${c.auto ? "false" : "plaintext-only"}" spellcheck="false" title="${c.auto ? "" : "Clique pour renommer"}">${esc(c.auto ? "Sauvegarde auto" : c.name)}</h1>
       <p class="meta">${esc(metaBits.join(", "))}.</p>
 
       <div class="note-block">
@@ -247,7 +273,7 @@ function renderDetail() {
       ${!c.items.length ? `<p class="muted" style="margin-top:2rem">Ce contexte ne contient rien à rouvrir. Mets-le à jour pendant que tes apps sont ouvertes.</p>` : ""}
 
       <div class="footer-actions">
-        <button class="btn ghost" data-action="pin">${icon("pin")}${c.pinned ? "Désépingler" : "Épingler"}</button>
+        ${c.auto ? "" : `<button class="btn ghost" data-action="pin">${icon("pin")}${c.pinned ? "Désépingler" : "Épingler"}</button>`}
         <button class="btn ghost" data-action="recapture" title="Remplacer le contenu par ce qui est ouvert maintenant">${icon("refresh")}Mettre à jour avec ce qui est ouvert</button>
         <span class="spacer"></span>
         <button class="btn ghost danger" data-action="delete">${icon("trash")}Supprimer</button>
@@ -307,7 +333,7 @@ async function saveNote() {
 
 async function rename(name) {
   const c = current();
-  if (!c) return;
+  if (!c || c.auto) return;
   const clean = name.replace(/\s+/g, " ").trim();
   if (!clean) { const t = $("#title"); if (t) t.textContent = c.name; return; }
   if (clean === c.name) return;
@@ -324,6 +350,22 @@ async function togglePin() {
   const u = await api.update(c.id, { pinned: !c.pinned });
   Object.assign(c, u);
   render();
+}
+
+async function keepAuto() {
+  const c = current();
+  if (!c) return;
+  try {
+    const u = await api.update(c.id, { auto: false });
+    Object.assign(c, u);
+    render();
+    const t = $("#title");
+    if (t) {
+      t.focus();
+      document.getSelection()?.selectAllChildren(t);
+    }
+    toast("Gardé. Donne-lui un nom, puis ajoute une phrase « où tu en étais ».");
+  } catch (e) { toast(String(e)); }
 }
 
 async function remove() {
@@ -387,6 +429,7 @@ detailEl.addEventListener("click", (e) => {
     case "save-note": saveNote(); break;
     case "cancel-note": state.editingNote = false; renderDetail(); break;
     case "pin": togglePin(); break;
+    case "keep": keepAuto(); break;
     case "delete": remove(); break;
     case "recapture": api.startCapture(c.id); break;
     case "capture": api.startCapture(); break;
@@ -539,6 +582,7 @@ function renderSettings() {
         <h3>Raccourcis</h3>
         ${rec("shortcut_save", "Sauvegarder le contexte")}
         ${rec("shortcut_open", "Ouvrir Reprise")}
+        ${rec("shortcut_resume", "Reprendre le dernier contexte")}
         ${settingsError ? `<div class="set-error">${esc(settingsError)}</div>` : ""}
       </div>
 
@@ -570,6 +614,19 @@ function renderSettings() {
         ${toggleRow("show_note", "Afficher le post-it « Tu en étais là »", "Un petit rappel de ta note, en haut à droite de l'écran.")}
         ${toggleRow("launch_at_login", "Lancer Reprise à l'ouverture de session", "Discrètement, dans la barre des menus.")}
         ${toggleRow("show_in_dock", "Icône dans le Dock", "Sinon, Reprise vit seulement dans la barre des menus.")}
+      </div>
+
+      <div class="set-group">
+        <h3>Filet de sécurité</h3>
+        ${toggleRow("auto_save", "Sauvegarder tout seul quand je m'absente", "Quand tu verrouilles ton Mac, qu'il se met en veille, ou après 5 minutes sans toucher au clavier. Reprise garde les 3 dernières.")}
+        ${toggleRow("welcome_back", "Me proposer de reprendre en revenant", "Un post-it « Tu étais sur… » après une absence.")}
+        <div class="set-row ${s.welcome_back ? "" : "dim"}">
+          <div class="label"><span>Après une absence de</span></div>
+          <div class="segmented" role="radiogroup" aria-label="Durée d'absence">
+            ${[10, 20, 30, 60].map((m) =>
+              `<button role="radio" aria-checked="${s.welcome_minutes === m}" data-set="welcome-min" data-value="${m}" ${s.welcome_back ? "" : "disabled"}>${m < 60 ? m + " min" : "1 h"}</button>`).join("")}
+          </div>
+        </div>
       </div>
 
       <div class="set-group">
@@ -612,6 +669,7 @@ function renderSettings() {
             <p><strong>Reprise ${esc(info?.version || "")}</strong></p>
             <p>Application vibe codée par RenzVASA avec Claude, l'IA d'Anthropic. Licence MIT.</p>
             <button class="btn" data-set="info">Comment marche Reprise</button>
+            <button class="btn" data-set="tour">Revoir la visite guidée</button>
             <button class="btn" data-set="github">Code source sur GitHub</button>
           </div>
         </div>
@@ -659,6 +717,8 @@ settingsEl.addEventListener("click", async (e) => {
     case "reveal": api.revealData().catch((err) => toast(String(err))); break;
     case "github": api.openLink("https://github.com/RenzVASA/reprise").catch(() => {}); break;
     case "info": settingsEl.close(); openInfo(); break;
+    case "tour": settingsEl.close(); runTour(); break;
+    case "welcome-min": saveSettings({ welcome_minutes: Number(t.dataset.value) }); break;
     case "check-update": checkForUpdates(true); break;
     case "unignore":
       saveSettings({ ignored_apps: state.settings.ignored_apps.filter((a) => a.bundle_id !== t.dataset.bundle) });
@@ -717,13 +777,15 @@ function updateLine() {
   if (updateChecking) return "Recherche en cours…";
   if (updateError) return updateError;
   if (!updateInfo) return "Pas encore vérifié depuis le lancement.";
-  return updateInfo.available ? `La version ${updateInfo.latest} est disponible.` : "Tu as la dernière version.";
+  if (!updateInfo.available) return "Tu as la dernière version.";
+  return updateInfo.can_install ? `La version ${updateInfo.latest} est prête à s'installer.` : `La version ${updateInfo.latest} est disponible.`;
 }
 
 function showUpdatePill() {
   const pill = $("#update-pill");
   if (updateInfo?.available) {
-    pill.innerHTML = `${icon("download")}<span>Version ${esc(updateInfo.latest)} disponible</span>`;
+    pill.innerHTML = `${icon("download")}<span>${updateInfo.can_install ? "Mettre à jour" : "Version " + esc(updateInfo.latest) + " disponible"}</span>`;
+    pill.title = `Reprise ${updateInfo.latest} est disponible`;
     pill.hidden = false;
   } else {
     pill.hidden = true;
@@ -751,10 +813,17 @@ async function checkForUpdates(manual) {
 }
 
 const updateEl = $("#update");
+let installing = false;
+
+function updateNotes() {
+  return (updateInfo?.notes || "").split("\n").map((l) => l.trim()).filter((l) => /^[-*•]\s+/.test(l))
+    .map((l) => l.replace(/^[-*•]\s+/, "").replace(/\*\*/g, ""));
+}
 
 function openUpdate() {
   if (!updateInfo) return;
-  const notes = (updateInfo.notes || "").split("\n").map((l) => l.trim()).filter((l) => /^[-*•]\s+/.test(l)).map((l) => l.replace(/^[-*•]\s+/, "").replace(/\*\*/g, ""));
+  const notes = updateNotes();
+  const auto = updateInfo.can_install;
   updateEl.innerHTML = `
     <div class="sheet-head">
       <h2 id="update-title">Reprise ${esc(updateInfo.latest)} est disponible</h2>
@@ -763,27 +832,72 @@ function openUpdate() {
     <div class="sheet-body">
       <p class="muted">Tu as la version ${esc(updateInfo.current)}.${notes.length ? " Nouveautés :" : ""}</p>
       ${notes.length ? `<ul class="notes">${notes.slice(0, 12).map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
-      <ol class="how">
-        <li>Télécharge le fichier <strong>.dmg</strong> sur la page de la version.</li>
-        <li>Quitte Reprise, puis glisse la nouvelle version dans Applications pour remplacer l'ancienne. Tes contextes et tes réglages sont gardés.</li>
-        <li>Dans le Terminal, une fois : <code>xattr -cr /Applications/Reprise.app</code></li>
-      </ol>
-      <div class="welcome-actions">
-        <button class="btn ghost" data-u="close">Plus tard</button>
-        <button class="btn primary" data-u="get">${icon("download")}Ouvrir la page de téléchargement</button>
-      </div>
+      ${auto ? `
+        <p class="how-auto">Reprise télécharge la nouvelle version, vérifie qu'elle vient bien de GitHub, l'installe et redémarre. Tes contextes et tes réglages sont gardés.</p>
+        <div class="progress" id="up-progress" hidden><div class="bar"><span id="up-bar"></span></div><span class="small muted" id="up-text">Téléchargement…</span></div>
+        <div class="welcome-actions">
+          <button class="btn ghost" data-u="close" id="up-later">Plus tard</button>
+          <button class="btn primary" data-u="install" id="up-install">${icon("download")}Mettre à jour et redémarrer</button>
+        </div>` : `
+        <ol class="how">
+          <li>Télécharge le fichier <strong>.dmg</strong> sur la page de la version.</li>
+          <li>Quitte Reprise, puis glisse la nouvelle version dans Applications pour remplacer l'ancienne. Tes contextes et tes réglages sont gardés.</li>
+          <li>Dans le Terminal, une fois : <code>xattr -cr /Applications/Reprise.app</code></li>
+        </ol>
+        <div class="welcome-actions">
+          <button class="btn ghost" data-u="close">Plus tard</button>
+          <button class="btn primary" data-u="get">${icon("download")}Ouvrir la page de téléchargement</button>
+        </div>`}
     </div>`;
   if (!updateEl.open) updateEl.showModal();
 }
 
+async function installUpdate() {
+  if (installing) return;
+  installing = true;
+  $("#up-progress").hidden = false;
+  $("#up-install").disabled = true;
+  $("#up-later").disabled = true;
+  $("#up-install").textContent = "Mise à jour en cours…";
+  try {
+    await api.installUpdate();
+  } catch (e) {
+    installing = false;
+    $("#up-text").textContent = String(e);
+    $("#up-install").disabled = false;
+    $("#up-later").disabled = false;
+    $("#up-install").textContent = "Réessayer";
+  }
+}
+
+on("update-progress", ({ downloaded, total }) => {
+  const bar = $("#up-bar"), txt = $("#up-text");
+  if (!bar) return;
+  const mb = (n) => (n / 1048576).toFixed(1).replace(".", ",");
+  if (total) {
+    bar.style.width = `${Math.min(100, (downloaded / total) * 100)}%`;
+    txt.textContent = `Téléchargement : ${mb(downloaded)} sur ${mb(total)} Mo`;
+  } else {
+    txt.textContent = `Téléchargement : ${mb(downloaded)} Mo`;
+  }
+});
+on("update-installed", () => {
+  const bar = $("#up-bar"), txt = $("#up-text");
+  if (bar) bar.style.width = "100%";
+  if (txt) txt.textContent = "Installé. Reprise redémarre…";
+});
+
 updateEl.addEventListener("click", (e) => {
   const t = e.target.closest("[data-u]");
-  if (!t) return;
+  if (!t || t.disabled) return;
+  if (t.dataset.u === "install") { installUpdate(); return; }
   if (t.dataset.u === "get") api.openLink(updateInfo.url).catch((err) => toast(String(err)));
   updateEl.close();
 });
+updateEl.addEventListener("cancel", (e) => { if (installing) e.preventDefault(); });
 $("#update-pill").addEventListener("click", openUpdate);
 on("update-available", (u) => { updateInfo = u; showUpdatePill(); });
+on("update-open", (u) => { updateInfo = u; showUpdatePill(); openUpdate(); });
 
 // ───────────────────────────── Info ────────────────────────────────
 
@@ -798,6 +912,7 @@ async function openInfo() {
 function renderInfo() {
   const save = prettyShortcut(state.settings?.shortcut_save || "Alt+Command+S");
   const open = prettyShortcut(state.settings?.shortcut_open || "Alt+Command+R");
+  const resume = prettyShortcut(state.settings?.shortcut_resume || "Alt+Shift+Command+R");
   infoEl.innerHTML = `
     <div class="sheet-head">
       <h2 id="info-title">Comment marche Reprise</h2>
@@ -805,13 +920,18 @@ function renderInfo() {
     </div>
     <div class="sheet-body prose">
       <p class="lead">Reprise sert à <span class="marker">ne plus perdre le fil quand tu es interrompu</span>. Elle prend une photo de ce sur quoi tu travailles, avec une phrase pour te souvenir où tu en étais, et remet tout en place quand tu reviens.</p>
+      <button class="btn" data-i="tour">Revoir la visite guidée</button>
 
       <h3>En trois gestes</h3>
       <ol class="steps-list">
         <li><strong>Appuie sur ${esc(save)}</strong>, depuis n'importe quelle app. Une petite fenêtre s'ouvre.</li>
         <li><strong>Écris où tu en es</strong>, en une phrase. Tu peux cliquer sur les pastilles (« 4 apps », « 12 onglets »…) pour décocher ce que tu ne veux pas garder. Entrée, c'est sauvegardé.</li>
-        <li><strong>Plus tard, clique sur Reprendre.</strong> Tout se rouvre, et ta phrase s'affiche sur un post-it en haut de l'écran.</li>
+        <li><strong>Plus tard, clique sur Reprendre.</strong> Tout se rouvre, les fenêtres à leur place, et ta phrase s'affiche sur un post-it en haut de l'écran. Encore plus rapide : <strong>${esc(resume)}</strong> reprend le dernier contexte sans ouvrir Reprise.</li>
       </ol>
+
+      <h3>Le filet de sécurité</h3>
+      <p>Tu as oublié d'appuyer sur ${esc(save)} ? Pas grave. Quand tu verrouilles ton Mac, qu'il se met en veille ou que tu ne touches plus au clavier pendant 5 minutes, Reprise sauvegarde toute seule. Elle garde les 3 dernières sauvegardes, en bas de la liste. Si l'une d'elles est importante, clique sur « Garder ce contexte ».</p>
+      <p>Et quand tu reviens après une vraie absence (Mac verrouillé ou en veille), un post-it te demande : « Tu étais sur… on reprend ? »</p>
 
       <h3>Ce qui est enregistré</h3>
       <ul>
@@ -819,6 +939,7 @@ function renderInfo() {
         <li>Les <strong>onglets</strong> de Safari, Chrome, Brave, Edge, Arc et Vivaldi, fenêtre par fenêtre.</li>
         <li>Les <strong>dossiers</strong> ouverts dans le Finder.</li>
         <li>Les <strong>fichiers</strong> ouverts dans tes apps (PDF, Pages, Keynote, VS Code…), si l'accès Accessibilité est autorisé.</li>
+        <li>La <strong>place et la taille</strong> de chaque fenêtre, y compris sur un deuxième écran. Si cet écran n'est plus branché, la fenêtre reste sur l'écran principal.</li>
       </ul>
       <p class="muted">Ce qui ne l'est pas : ce qu'il y a <em>dans</em> les apps (la chanson en cours, un texte pas encore enregistré, la position dans une vidéo), les onglets de Firefox et souvent ceux de navigation privée. C'est pour ça que ta phrase compte.</p>
 
@@ -830,10 +951,14 @@ function renderInfo() {
       <h3>Tes données</h3>
       <p>Tout est rangé dans un simple fichier sur ton Mac. Aucun compte, aucune pub, aucun traceur. La seule connexion à Internet sert à vérifier s'il existe une nouvelle version sur GitHub, et tu peux la couper dans les réglages.</p>
 
+      <h3>Les mises à jour</h3>
+      <p>Quand une nouvelle version sort, un bouton « Mettre à jour » apparaît en haut de la fenêtre. Un clic, et Reprise la télécharge, vérifie sa signature (pour être sûre qu'elle vient bien de GitHub et que personne ne l'a modifiée), l'installe et redémarre. Tes contextes et tes réglages restent intacts.</p>
+
       <h3>Raccourcis</h3>
       <table class="keys-table">
         <tr><td><kbd>${esc(save)}</kbd></td><td>Sauvegarder ce qui est ouvert, depuis n'importe où</td></tr>
         <tr><td><kbd>${esc(open)}</kbd></td><td>Ouvrir Reprise</td></tr>
+        <tr><td><kbd>${esc(resume)}</kbd></td><td>Reprendre le dernier contexte, depuis n'importe où</td></tr>
         <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Passer d'un contexte à l'autre</td></tr>
         <tr><td><kbd>↵</kbd></td><td>Reprendre le contexte choisi</td></tr>
         <tr><td><kbd>⌘F</kbd></td><td>Chercher</td></tr>
@@ -863,6 +988,7 @@ infoEl.addEventListener("click", (e) => {
   if (t.dataset.i === "close") infoEl.close();
   if (t.dataset.i === "github") api.openLink("https://github.com/RenzVASA/reprise").catch(() => {});
   if (t.dataset.i === "update") checkForUpdates(true);
+  if (t.dataset.i === "tour") { infoEl.close(); runTour(); }
 });
 
 // ───────────────────────────── Accueil ─────────────────────────────
@@ -884,10 +1010,9 @@ function renderWelcome() {
      <div class="perm-card"><div class="perm"><div><div class="what">Accessibilité</div><div class="why">Les fichiers ouverts dans tes apps. Facultatif.</div></div>
        <span class="perm"><span class="perm-dot ${perms?.accessibility || ""}"></span><button class="btn ghost" data-w="pane" data-kind="accessibility">Réglages</button></span></div></div>
      <button class="btn" data-w="check">${perms === "loading" ? "Vérification…" : "Demander les autorisations"}</button>`,
-    `<h2 id="welcome-title">À toi de jouer</h2>
-     <p>Va dans une autre app, ouvre ce sur quoi tu travailles, puis appuie sur <strong>${esc(sc)}</strong>. Écris ta phrase, valide avec Entrée, et c'est sauvegardé.</p>
-     <p>Reprise reste disponible dans la barre des menus, en haut à droite de l'écran.</p>
-     <div class="set-row"><div class="label"><span>Lancer Reprise à l'ouverture de session</span></div>
+    `<h2 id="welcome-title">Une visite d'une minute ?</h2>
+     <p>Je te montre où est chaque chose, sur un exemple. Tu pourras la revoir quand tu veux avec le bouton <strong>i</strong>, en haut de la fenêtre.</p>
+     <div class="set-row"><div class="label"><span>Lancer Reprise à l'ouverture de session</span><span class="hint">Pour que le filet de sécurité soit toujours là.</span></div>
        <label class="switch"><input type="checkbox" data-w="login" ${state.settings?.launch_at_login ? "checked" : ""}><span class="track"></span></label></div>`,
   ];
   welcomeEl.innerHTML = `
@@ -895,8 +1020,8 @@ function renderWelcome() {
       <div class="step-count">Étape ${step + 1} sur ${steps.length}</div>
       ${steps[step]}
       <div class="welcome-actions">
-        ${step > 0 ? `<button class="btn ghost" data-w="back">Retour</button>` : "<span></span>"}
-        <button class="btn primary" data-w="${step === steps.length - 1 ? "done" : "next"}">${step === steps.length - 1 ? "C'est parti" : "Continuer"}</button>
+        ${step === steps.length - 1 ? `<button class="btn ghost" data-w="skip">Passer</button>` : step > 0 ? `<button class="btn ghost" data-w="back">Retour</button>` : "<span></span>"}
+        <button class="btn primary" data-w="${step === steps.length - 1 ? "done" : "next"}">${step === steps.length - 1 ? "Faire la visite" : "Continuer"}</button>
       </div>
     </div>`;
 }
@@ -915,14 +1040,125 @@ welcomeEl.addEventListener("click", async (e) => {
       break;
     case "done":
       welcomeEl.close();
-      await saveSettings({ onboarded: true });
+      await finishOnboarding();
+      runTour();
+      break;
+    case "skip":
+      welcomeEl.close();
+      await finishOnboarding();
+      break;
+    case "whatsnew-tour":
+      welcomeEl.close();
+      runTour();
+      break;
+    case "whatsnew-ok":
+      welcomeEl.close();
       break;
   }
 });
+
+async function finishOnboarding() {
+  await saveSettings({ onboarded: true });
+  try { state.settings = await api.markSeen("", info?.version || null); } catch { /* sans gravité */ }
+}
+
+// ───────────────────────────── Visite guidée ───────────────────────
+
+const DEMO_ID = "__visite__";
+const DEMO_AUTO_ID = "__visite_auto__";
+
+function demoContexts() {
+  const now = Date.now();
+  const it = (id, kind, app, label, value, group = null) => ({ id, kind, app_name: app, bundle_id: null, label, value, group, frames: [] });
+  return [
+    {
+      id: DEMO_ID, name: "Exemple : exposé d'histoire", pinned: false, auto: false,
+      note: "Il reste la conclusion. Les sources de la diapo 7 sont dans l'onglet Lumni.",
+      created_at: now - 3600e3, updated_at: now - 3600e3, last_restored_at: null, restore_count: 0, front_app: "Keynote",
+      items: [
+        it("v1", "app", "Keynote", "Keynote", "k"), it("v2", "app", "Safari", "Safari", "s"),
+        it("v3", "tab", "Safari", "La guerre froide en 10 dates – Lumni", "https://www.lumni.fr/dossier/la-guerre-froide", 1),
+        it("v4", "tab", "Safari", "Crise des missiles de Cuba — Wikipédia", "https://fr.wikipedia.org/wiki/Crise_des_missiles_de_Cuba", 1),
+        it("v5", "folder", "Finder", "Histoire", "/Users/toi/Documents/Histoire"),
+        it("v6", "document", "Keynote", "Exposé.key", "/Users/toi/Documents/Histoire/Exposé.key"),
+      ],
+    },
+    {
+      id: DEMO_AUTO_ID, name: "Sauvegarde auto", pinned: false, auto: true, note: "",
+      created_at: now - 7200e3, updated_at: now - 7200e3, last_restored_at: null, restore_count: 0, front_app: "Safari",
+      items: [it("w1", "app", "Safari", "Safari", "s")],
+    },
+  ];
+}
+
+function runTour() {
+  for (const d of document.querySelectorAll("dialog[open]")) d.close();
+  const before = { contexts: state.contexts, selected: state.selected, query: state.query };
+  // Toujours le même exemple, pour que la visite soit identique pour tout le monde.
+  state.touring = true;
+  state.contexts = demoContexts();
+  state.selected = DEMO_ID;
+  state.query = "";
+  searchEl.value = "";
+  render();
+  detailEl.scrollTop = 0;
+
+  const s = state.settings || {};
+  const save = prettyShortcut(s.shortcut_save || "Alt+Command+S");
+  const resume = prettyShortcut(s.shortcut_resume || "Alt+Shift+Command+R");
+  startTour([
+    { title: "Voici un exemple", text: "Pour la visite, j'ai préparé un faux contexte : un exposé d'histoire en cours. Rien n'est enregistré, il disparaîtra à la fin." },
+    { target: "#btn-capture", title: "Sauvegarder", text: `Le geste principal : <strong>${esc(save)}</strong>, depuis n'importe quelle app. Ce bouton fait la même chose.` },
+    { target: "#list", title: "Tes contextes", text: "Ils sont rangés par jour, les épinglés en haut. Cherche dans les noms, les notes et les onglets avec <strong>⌘F</strong>." },
+    { target: ".note-block", title: "Où tu en étais", text: "La phrase que tu écris en sauvegardant, surlignée pour la voir tout de suite. Clique dessus pour la modifier." },
+    { target: ".resume-bar", title: "Reprendre", text: `Un clic rouvre tout, fenêtres à leur place. « Faire place nette » masque le reste. Depuis n'importe où : <strong>${esc(resume)}</strong>.` },
+    { target: ".section", title: "Choisir ce qu'on rouvre", text: "Décoche ce dont tu n'as plus besoin. Survole une ligne pour rouvrir un seul élément." },
+    { target: ".group-title.safety", title: "Le filet de sécurité", text: "Si tu oublies de sauvegarder, Reprise le fait toute seule quand tu verrouilles ton Mac ou que tu t'absentes. Elle garde les 3 dernières ici." },
+    { target: ".top-actions", title: "Aide et réglages", text: "Le <strong>i</strong> explique tout, la roue règle les polices, les raccourcis et le filet. Reprise vit aussi dans la barre des menus, en haut à droite de l'écran." },
+    { title: "À toi de jouer", text: `Va dans une autre app, ouvre ce sur quoi tu travailles, et appuie sur <strong>${esc(save)}</strong>. Écris ta phrase, Entrée, c'est sauvegardé.` },
+  ], {
+    doneLabel: "C'est parti",
+    onEnd: () => {
+      state.touring = false;
+      state.contexts = before.contexts;
+      state.selected = before.selected;
+      state.query = before.query;
+      searchEl.value = before.query;
+      api.markSeen("tour").then((s2) => { state.settings = s2; }).catch(() => {});
+      load();
+    },
+  });
+}
+
+// ───────────────────────────── Nouveautés ──────────────────────────
+
+const WHATS_NEW = [
+  ["Les fenêtres reviennent à leur place", "Position et taille, y compris sur un deuxième écran."],
+  ["Le filet de sécurité", "Reprise sauvegarde toute seule quand tu verrouilles ton Mac ou que tu t'absentes."],
+  ["« Tu étais sur… »", "En revenant, un post-it te propose de reprendre."],
+  ["Reprendre le dernier contexte en un raccourci", "⌥⇧⌘R, depuis n'importe quelle app."],
+  ["Les mises à jour s'installent toutes seules", "Un clic, Reprise redémarre à jour."],
+];
+
+function showWhatsNew(version) {
+  welcomeEl.innerHTML = `
+    <div class="sheet-body">
+      <div class="step-count">Reprise ${esc(version)}</div>
+      <h2 id="welcome-title">Quoi de neuf ?</h2>
+      <ul class="whatsnew">
+        ${WHATS_NEW.map(([t, d]) => `<li><strong>${esc(t)}</strong><span>${esc(d)}</span></li>`).join("")}
+      </ul>
+      <div class="welcome-actions">
+        <button class="btn ghost" data-w="whatsnew-tour">Revoir la visite guidée</button>
+        <button class="btn primary" data-w="whatsnew-ok">Super</button>
+      </div>
+    </div>`;
+  welcomeEl.showModal();
+}
 welcomeEl.addEventListener("change", (e) => {
   if (e.target.dataset.w === "login") saveSettings({ launch_at_login: e.target.checked });
 });
-welcomeEl.addEventListener("cancel", () => saveSettings({ onboarded: true }));
+welcomeEl.addEventListener("cancel", () => { if (!state.settings?.onboarded) finishOnboarding(); });
 
 // ───────────────────────────── Démarrage ───────────────────────────
 
@@ -935,9 +1171,14 @@ welcomeEl.addEventListener("cancel", () => saveSettings({ onboarded: true }));
   updateShortcutHints();
   await load();
   try { updateInfo = await api.getUpdate(); } catch { updateInfo = null; }
+  try { info = await api.info(); } catch { info = null; }
   showUpdatePill();
   if (state.settings && !state.settings.onboarded) {
     renderWelcome();
     welcomeEl.showModal();
+  } else if (state.settings && info && state.settings.last_version !== info.version) {
+    // Première ouverture après une mise à jour : on montre les nouveautés une fois.
+    showWhatsNew(info.version);
+    api.markSeen("", info.version).then((s2) => { state.settings = s2; }).catch(() => {});
   }
 })();

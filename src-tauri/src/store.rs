@@ -2,7 +2,7 @@
 //! (~/Library/Application Support/io.github.renzvasa.reprise/contexts.json).
 //! Écriture atomique (fichier temporaire puis renommage) pour ne jamais rien perdre.
 
-use crate::model::{now_ms, Context, ContextPatch};
+use crate::model::{new_id, now_ms, Context, ContextPatch, Snapshot};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -12,6 +12,9 @@ struct FileFormat {
     version: u32,
     contexts: Vec<Context>,
 }
+
+/// Nom donné aux sauvegardes du filet de sécurité.
+pub const AUTO_NAME: &str = "Sauvegarde auto";
 
 pub struct Store {
     path: PathBuf,
@@ -88,6 +91,12 @@ impl Store {
         if let Some(p) = patch.pinned {
             c.pinned = p;
         }
+        if let Some(a) = patch.auto {
+            c.auto = a;
+            if !a && c.name == AUTO_NAME {
+                c.name = "Contexte gardé".into();
+            }
+        }
         c.updated_at = now_ms();
         let out = c.clone();
         self.save()?;
@@ -109,9 +118,61 @@ impl Store {
         self.save()
     }
 
-    /// Les contextes à proposer dans la barre des menus : épinglés puis récents.
+    /// Le contexte à reprendre en priorité : le dernier utilisé parmi ceux qu'on a faits
+    /// soi-même, sinon la dernière sauvegarde auto.
+    pub fn latest(&self) -> Option<&Context> {
+        self.contexts
+            .iter()
+            .filter(|c| !c.auto)
+            .max_by_key(|c| c.last_used())
+            .or_else(|| self.contexts.iter().filter(|c| c.auto).max_by_key(|c| c.updated_at))
+    }
+
+    /// Enregistre une sauvegarde du filet de sécurité. Si rien n'a changé depuis la
+    /// précédente, on rafraîchit juste sa date. On en garde au plus `keep`.
+    /// Renvoie `true` si quelque chose a changé.
+    pub fn add_auto(&mut self, snap: Snapshot, keep: usize) -> Result<bool, String> {
+        if snap.items.is_empty() {
+            return Ok(false);
+        }
+        let now = now_ms();
+        let sig = Context::signature(&snap.items);
+        let last_auto = self.contexts.iter_mut().filter(|c| c.auto).max_by_key(|c| c.updated_at);
+        if let Some(last) = last_auto {
+            if Context::signature(&last.items) == sig {
+                last.updated_at = now;
+                // Les positions des fenêtres ont pu bouger : on garde les plus récentes.
+                last.items = snap.items;
+                self.save()?;
+                return Ok(true);
+            }
+        }
+        self.contexts.push(Context {
+            id: new_id(),
+            name: AUTO_NAME.into(),
+            note: String::new(),
+            created_at: now,
+            updated_at: now,
+            last_restored_at: None,
+            restore_count: 0,
+            pinned: false,
+            front_app: snap.front_app,
+            items: snap.items,
+            auto: true,
+        });
+        // On ne garde que les plus récentes.
+        let mut autos: Vec<(u64, String)> = self.contexts.iter().filter(|c| c.auto).map(|c| (c.updated_at, c.id.clone())).collect();
+        autos.sort_by(|a, b| b.0.cmp(&a.0));
+        let drop: Vec<String> = autos.into_iter().skip(keep).map(|(_, id)| id).collect();
+        self.contexts.retain(|c| !drop.contains(&c.id));
+        self.save()?;
+        Ok(true)
+    }
+
+    /// Les contextes à proposer dans la barre des menus : épinglés puis récents
+    /// (sans les sauvegardes auto).
     pub fn recent(&self, n: usize) -> Vec<Context> {
-        let mut v = self.list();
+        let mut v: Vec<Context> = self.list().into_iter().filter(|c| !c.auto).collect();
         v.sort_by(|a, b| {
             b.pinned
                 .cmp(&a.pinned)
@@ -121,3 +182,4 @@ impl Store {
         v
     }
 }
+

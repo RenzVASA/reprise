@@ -38,3 +38,10 @@ html, body { height: 100%; overflow: hidden; background: #FFE16B; }
 }
 .postit-go:hover { background: #2A2410; color: #FFE16B; }
 :focus-visible { outline-color: #2A2410; }
+.postit-foot { gap: .5rem; }
+.postit-go.ghost { border-color: transparent; opacity: .75; }
+.postit-go.ghost:hover { background: rgba(42, 36, 16, .08); color: #2A2410; opacity: 1; }
+.postit-go.primary { background: #2A2410; color: #FFE16B; }
+.postit-go.primary:hover { background: #3d3418; }
+.postit-go:disabled { opacity: .6; cursor: default; }
+.postit-text.empty { opacity: .6; font-style: italic; }

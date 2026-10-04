@@ -7,8 +7,9 @@ mod script;
 mod settings;
 mod store;
 mod update;
+mod watch;
 
-use model::{now_ms, new_id, Context, ContextPatch, PendingCapture, RestoreReport, Snapshot};
+use model::{now_ms, new_id, Context, ContextPatch, PendingCapture, RestoreReport, Screen, Snapshot};
 use script::{Osascript, Runner, ScriptError};
 use serde::Serialize;
 use settings::{IgnoredApp, Settings};
@@ -21,6 +22,7 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_updater::UpdaterExt;
 
 const TRAY_ID: &str = "reprise-tray";
 
@@ -31,12 +33,17 @@ pub struct NotePayload {
     pub id: String,
     pub name: String,
     pub note: String,
+    /// "note" : post-it après une reprise. "welcome" : « Tu étais sur… » au retour.
+    pub mode: String,
+    /// Durée de l'absence, pour le mode « welcome ».
+    pub away_ms: u64,
 }
 
 #[derive(Default)]
 struct Shortcuts {
     save: Option<Shortcut>,
     open: Option<Shortcut>,
+    resume: Option<Shortcut>,
 }
 
 struct AppState {
@@ -50,6 +57,12 @@ struct AppState {
     shortcuts: Mutex<Shortcuts>,
     /// Dernier résultat de la recherche de mise à jour.
     update: Mutex<Option<update::UpdateInfo>>,
+    /// La mise à jour prête à être installée (trouvée par le module de mise à jour de Tauri).
+    installable: Mutex<Option<tauri_plugin_updater::Update>>,
+    /// Une installation est en cours.
+    installing: Mutex<bool>,
+    /// Une sauvegarde auto est en cours (pour ne pas en lancer deux à la fois).
+    auto_running: Mutex<bool>,
 }
 
 /// Verrou qui survit à un panic dans un autre fil (on préfère des données un peu
@@ -155,8 +168,8 @@ fn restore_internal(app: &AppHandle, id: &str, items: Option<Vec<String>>, tidy:
         (s.tidy_by_default, s.show_note)
     };
     let selected: Option<HashSet<String>> = items.map(|v| v.into_iter().collect());
-    let actions = restore::plan(&ctx, selected.as_ref(), tidy.unwrap_or(tidy_default));
-    let report = restore::execute(&Osascript::default(), &actions, &own_bundle(app));
+    let actions = restore::plan(&ctx, selected.as_ref(), tidy.unwrap_or(tidy_default), &screens(app));
+    let report = restore::execute(&Osascript::default(), &actions, &own_bundle(app), &restore::Timing::default());
 
     lock(&state.store).mark_restored(id)?;
     notify_changed(app);
@@ -165,10 +178,54 @@ fn restore_internal(app: &AppHandle, id: &str, items: Option<Vec<String>>, tidy:
         hide_window(app, "main");
     }
     if show_note && !ctx.note.trim().is_empty() {
-        *lock(&state.note) = Some(NotePayload { id: ctx.id.clone(), name: ctx.name.clone(), note: ctx.note.clone() });
+        *lock(&state.note) = Some(NotePayload {
+            id: ctx.id.clone(),
+            name: ctx.name.clone(),
+            note: ctx.note.clone(),
+            mode: "note".into(),
+            away_ms: 0,
+        });
         show_note_window(app);
+    } else {
+        hide_window(app, "note");
     }
     Ok(report)
+}
+
+/// Les écrans branchés, en points (pour ne pas envoyer une fenêtre hors de l'écran).
+fn screens(app: &AppHandle) -> Vec<Screen> {
+    app.available_monitors()
+        .unwrap_or_default()
+        .iter()
+        .map(|m| {
+            let k = m.scale_factor().max(1.0);
+            Screen {
+                x: (m.position().x as f64 / k).round() as i32,
+                y: (m.position().y as f64 / k).round() as i32,
+                w: (m.size().width as f64 / k).round() as i32,
+                h: (m.size().height as f64 / k).round() as i32,
+            }
+        })
+        .collect()
+}
+
+/// Reprendre le contexte le plus récent (raccourci, menu, « Tu étais sur… »).
+fn resume_latest(app: &AppHandle) {
+    let id = lock(&app.state::<AppState>().store).latest().map(|c| c.id.clone());
+    match id {
+        Some(id) => {
+            let app = app.clone();
+            std::thread::spawn(move || {
+                if let Err(e) = restore_internal(&app, &id, None, None) {
+                    let _ = app.emit("toast", e);
+                }
+            });
+        }
+        None => {
+            show_window(app, "main");
+            let _ = app.emit("toast", "Aucun contexte à reprendre pour l'instant.");
+        }
+    }
 }
 
 fn show_note_window(app: &AppHandle) {
@@ -190,8 +247,12 @@ fn show_note_window(app: &AppHandle) {
 
 fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let state = app.state::<AppState>();
-    let shortcut = lock(&state.settings).shortcut_save.clone();
+    let (shortcut, resume_sc) = {
+        let s = lock(&state.settings);
+        (s.shortcut_save.clone(), s.shortcut_resume.clone())
+    };
     let recent = lock(&state.store).recent(6);
+    let last_auto = lock(&state.store).contexts.iter().filter(|c| c.auto).max_by_key(|c| c.updated_at).cloned();
 
     let menu = Menu::new(app)?;
     menu.append(&MenuItem::with_id(
@@ -199,6 +260,13 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         "save",
         format!("Sauvegarder le contexte…   {}", pretty_shortcut(&shortcut)),
         true,
+        None::<&str>,
+    )?)?;
+    menu.append(&MenuItem::with_id(
+        app,
+        "resume-last",
+        format!("Reprendre le dernier contexte   {}", pretty_shortcut(&resume_sc)),
+        !recent.is_empty() || last_auto.is_some(),
         None::<&str>,
     )?)?;
     menu.append(&PredefinedMenuItem::separator(app)?)?;
@@ -211,8 +279,12 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             menu.append(&MenuItem::with_id(app, format!("restore:{}", c.id), label, true, None::<&str>)?)?;
         }
     }
+    if let Some(a) = last_auto {
+        menu.append(&MenuItem::with_id(app, format!("restore:{}", a.id), "    Dernière sauvegarde auto", true, None::<&str>)?)?;
+    }
     menu.append(&PredefinedMenuItem::separator(app)?)?;
     let update_label = match lock(&state.update).as_ref() {
+        Some(u) if u.available && u.can_install => format!("Installer la version {}…", u.latest),
         Some(u) if u.available => format!("Nouvelle version {} disponible…", u.latest),
         _ => "Rechercher les mises à jour…".to_string(),
     };
@@ -265,16 +337,21 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
                 "save" => begin_capture(app.clone(), None, false),
                 "open" => show_window(app, "main"),
                 "quit" => app.exit(0),
+                "resume-last" => resume_latest(app),
                 "update" => {
                     show_window(app, "main");
                     let app = app.clone();
-                    std::thread::spawn(move || match run_update_check(&app) {
-                        Ok(info) if !info.available => {
-                            let _ = app.emit("toast", format!("Reprise est à jour (version {}).", info.current));
-                        }
-                        Ok(_) => {}
-                        Err(e) => {
-                            let _ = app.emit("toast", e);
+                    tauri::async_runtime::spawn(async move {
+                        match run_update_check(&app).await {
+                            Ok(info) if !info.available => {
+                                let _ = app.emit("toast", format!("Reprise est à jour (version {}).", info.current));
+                            }
+                            Ok(info) => {
+                                let _ = app.emit("update-open", info);
+                            }
+                            Err(e) => {
+                                let _ = app.emit("toast", e);
+                            }
                         }
                     });
                 }
@@ -297,28 +374,32 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
 
 // ───────────────────────────── Raccourcis globaux ────────────────────────────
 
-fn apply_shortcuts(app: &AppHandle, save: &str, open: &str) -> Result<(), String> {
-    let save_sc: Shortcut = save.parse().map_err(|_| format!("Raccourci invalide : {save}"))?;
-    let open_sc: Shortcut = open.parse().map_err(|_| format!("Raccourci invalide : {open}"))?;
-    if save_sc == open_sc {
-        return Err("Les deux raccourcis doivent être différents.".into());
+fn apply_shortcuts(app: &AppHandle, save: &str, open: &str, resume: &str) -> Result<(), String> {
+    let parse = |s: &str| s.parse::<Shortcut>().map_err(|_| format!("Raccourci invalide : {s}"));
+    let (save_sc, open_sc, resume_sc) = (parse(save)?, parse(open)?, parse(resume)?);
+    if save_sc == open_sc || save_sc == resume_sc || open_sc == resume_sc {
+        return Err("Les raccourcis doivent être tous différents.".into());
     }
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
-    gs.register(save_sc)
-        .map_err(|_| format!("Le raccourci {} est déjà pris par une autre app.", pretty_shortcut(save)))?;
-    gs.register(open_sc)
-        .map_err(|_| format!("Le raccourci {} est déjà pris par une autre app.", pretty_shortcut(open)))?;
+    for (sc, txt) in [(save_sc, save), (open_sc, open), (resume_sc, resume)] {
+        gs.register(sc)
+            .map_err(|_| format!("Le raccourci {} est déjà pris par une autre app.", pretty_shortcut(txt)))?;
+    }
     let state = app.state::<AppState>();
-    *lock(&state.shortcuts) = Shortcuts { save: Some(save_sc), open: Some(open_sc) };
+    *lock(&state.shortcuts) = Shortcuts { save: Some(save_sc), open: Some(open_sc), resume: Some(resume_sc) };
     Ok(())
+}
+
+fn apply_shortcuts_from(app: &AppHandle, s: &Settings) -> Result<(), String> {
+    apply_shortcuts(app, &s.shortcut_save, &s.shortcut_open, &s.shortcut_resume)
 }
 
 fn on_shortcut(app: &AppHandle, shortcut: &Shortcut) {
     let state = app.state::<AppState>();
-    let (is_save, is_open) = {
+    let (is_save, is_open, is_resume) = {
         let s = lock(&state.shortcuts);
-        (s.save.as_ref() == Some(shortcut), s.open.as_ref() == Some(shortcut))
+        (s.save.as_ref() == Some(shortcut), s.open.as_ref() == Some(shortcut), s.resume.as_ref() == Some(shortcut))
     };
     if is_save {
         // Fenêtre déjà ouverte : on la remet juste au premier plan.
@@ -333,7 +414,78 @@ fn on_shortcut(app: &AppHandle, shortcut: &Shortcut) {
         }
     } else if is_open {
         show_window(app, "main");
+    } else if is_resume {
+        resume_latest(app);
     }
+}
+
+// ───────────────────────────── Filet de sécurité ─────────────────────────────
+
+/// Sauvegarde auto, sans fenêtre. Ne fait rien si une sauvegarde à la main est en cours.
+fn auto_snapshot(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    if lock(&state.pending).is_some() {
+        return;
+    }
+    {
+        let mut running = lock(&state.auto_running);
+        if *running {
+            return;
+        }
+        *running = true;
+    }
+    let ignored = lock(&state.settings).ignored_ids();
+    let result = capture::capture_all(&Osascript::default(), &own_bundle(app), &ignored);
+    if let Ok(snap) = result {
+        if matches!(lock(&state.store).add_auto(snap, 3), Ok(true)) {
+            notify_changed(app);
+        }
+    }
+    *lock(&state.auto_running) = false;
+}
+
+/// « Tu étais sur… » : petit post-it pour reprendre en revenant.
+fn welcome_back(app: &AppHandle, away_ms: u64) {
+    let state = app.state::<AppState>();
+    let Some(ctx) = lock(&state.store).latest().cloned() else { return };
+    // Déjà repris il y a moins de 2 minutes : inutile de proposer.
+    if ctx.last_restored_at.is_some_and(|t| now_ms().saturating_sub(t) < 120_000) {
+        return;
+    }
+    *lock(&state.note) = Some(NotePayload {
+        id: ctx.id.clone(),
+        name: if ctx.auto { "Ta dernière sauvegarde auto".into() } else { ctx.name.clone() },
+        note: ctx.note.clone(),
+        mode: "welcome".into(),
+        away_ms,
+    });
+    show_note_window(app);
+}
+
+fn start_watcher(app: AppHandle) {
+    std::thread::spawn(move || {
+        let mut w = watch::Watch::default();
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(15));
+            let (enabled_save, enabled_welcome, minutes, onboarded) = {
+                let state = app.state::<AppState>();
+                let s = lock(&state.settings);
+                (s.auto_save, s.welcome_back, s.welcome_minutes, s.onboarded)
+            };
+            let cfg = watch::Config { idle_snapshot_secs: 300, welcome_after_ms: minutes as u64 * 60_000 };
+            let events = w.tick(now_ms(), watch::screen_locked(), watch::idle_seconds(), &cfg);
+            if !onboarded {
+                continue;
+            }
+            for ev in events {
+                match ev {
+                    watch::Event::Snapshot if enabled_save => auto_snapshot(&app),
+                    watch::Event::WelcomeBack { away_ms } if enabled_welcome => welcome_back(&app, away_ms),
+                    _ => {}
+                }
+            }
+        }
+    });
 }
 
 #[cfg(target_os = "macos")]
@@ -420,6 +572,7 @@ fn save_capture(app: AppHandle, name: String, note: String, exclude: Option<Vec<
                 c.items = snap.items;
                 c.front_app = snap.front_app;
                 c.updated_at = now;
+                c.auto = false;
                 store.insert(c.clone())?;
                 c
             }
@@ -435,6 +588,7 @@ fn save_capture(app: AppHandle, name: String, note: String, exclude: Option<Vec<
                     pinned: false,
                     front_app: snap.front_app,
                     items: snap.items,
+                    auto: false,
                 };
                 store.insert(c.clone())?;
                 c
@@ -501,10 +655,52 @@ fn ignore_app(app: AppHandle, bundle_id: String, name: String) -> Result<Setting
     Ok(s)
 }
 
-fn run_update_check(app: &AppHandle) -> Result<update::UpdateInfo, String> {
-    let current = app.package_info().version.to_string();
-    let info = update::check(&current)?;
+/// Cherche une nouvelle version. D'abord avec le module de mise à jour intégré (qui sait
+/// l'installer tout seul) ; s'il ne trouve pas de fichier de mise à jour, on demande à GitHub
+/// (on peut alors seulement ouvrir la page de téléchargement).
+async fn run_update_check(app: &AppHandle) -> Result<update::UpdateInfo, String> {
     let state = app.state::<AppState>();
+    let current = app.package_info().version.to_string();
+
+    let integrated = match app.updater() {
+        Ok(u) => u.check().await.map_err(|e| e.to_string()),
+        Err(e) => Err(e.to_string()),
+    };
+    let info = match integrated {
+        Ok(Some(up)) => {
+            let info = update::UpdateInfo {
+                current: current.clone(),
+                latest: up.version.clone(),
+                available: true,
+                url: format!("https://github.com/{}/releases/latest", update::REPO),
+                dmg_url: None,
+                notes: up.body.clone().unwrap_or_default(),
+                can_install: true,
+            };
+            *lock(&state.installable) = Some(up);
+            info
+        }
+        Ok(None) => {
+            *lock(&state.installable) = None;
+            update::UpdateInfo {
+                current: current.clone(),
+                latest: current.clone(),
+                available: false,
+                url: format!("https://github.com/{}/releases/latest", update::REPO),
+                dmg_url: None,
+                notes: String::new(),
+                can_install: false,
+            }
+        }
+        Err(_) => {
+            *lock(&state.installable) = None;
+            let c = current.clone();
+            tauri::async_runtime::spawn_blocking(move || update::check(&c))
+                .await
+                .map_err(|e| e.to_string())??
+        }
+    };
+
     *lock(&state.update) = Some(info.clone());
     {
         let mut s = lock(&state.settings);
@@ -521,15 +717,89 @@ fn run_update_check(app: &AppHandle) -> Result<update::UpdateInfo, String> {
 /// Bouton « Vérifier les mises à jour ».
 #[tauri::command]
 async fn check_updates(app: AppHandle) -> Result<update::UpdateInfo, String> {
-    let handle = app.clone();
-    tauri::async_runtime::spawn_blocking(move || run_update_check(&handle))
-        .await
-        .map_err(|e| e.to_string())?
+    run_update_check(&app).await
 }
 
 #[tauri::command]
 fn get_update(app: AppHandle) -> Option<update::UpdateInfo> {
     lock(&app.state::<AppState>().update).clone()
+}
+
+#[derive(Clone, Serialize)]
+struct Progress {
+    downloaded: u64,
+    total: Option<u64>,
+}
+
+/// Télécharge la nouvelle version, vérifie sa signature, remplace l'app et redémarre.
+/// Les contextes et les réglages ne sont pas touchés : ils sont rangés à part.
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    {
+        let mut busy = lock(&state.installing);
+        if *busy {
+            return Err("La mise à jour est déjà en cours.".into());
+        }
+        *busy = true;
+    }
+    let pending = lock(&state.installable).clone();
+    let Some(up) = pending else {
+        *lock(&state.installing) = false;
+        return Err("Aucune mise à jour prête. Clique sur « Vérifier » d'abord.".into());
+    };
+
+    let mut downloaded: u64 = 0;
+    let progress_app = app.clone();
+    let result = up
+        .download_and_install(
+            move |chunk, total| {
+                downloaded += chunk as u64;
+                let _ = progress_app.emit("update-progress", Progress { downloaded, total });
+            },
+            || {},
+        )
+        .await;
+
+    match result {
+        Ok(()) => {
+            let _ = app.emit("update-installed", ());
+            // Laisse à l'interface le temps d'afficher « Redémarrage… ».
+            tokio_sleep_ms(600).await;
+            app.restart();
+        }
+        Err(e) => {
+            *lock(&state.installing) = false;
+            Err(format!("La mise à jour n'a pas pu s'installer : {e}"))
+        }
+    }
+}
+
+async fn tokio_sleep_ms(ms: u64) {
+    let _ = tauri::async_runtime::spawn_blocking(move || std::thread::sleep(std::time::Duration::from_millis(ms))).await;
+}
+
+/// Reprendre le dernier contexte (bouton du post-it « Tu étais sur… »).
+#[tauri::command]
+fn resume_last(app: AppHandle) {
+    resume_latest(&app);
+}
+
+/// Une astuce ou la visite guidée a été vue.
+#[tauri::command]
+fn mark_seen(app: AppHandle, key: String, version: Option<String>) -> Result<Settings, String> {
+    let state = app.state::<AppState>();
+    let mut s = lock(&state.settings).clone();
+    if !key.is_empty() && !s.seen.contains(&key) {
+        s.seen.push(key);
+    }
+    if let Some(v) = version {
+        s.last_version = v;
+    }
+    let s = s.sanitized();
+    s.save(&state.settings_path)?;
+    *lock(&state.settings) = s.clone();
+    Ok(s)
 }
 
 /// Pendant qu'on enregistre une nouvelle combinaison dans les réglages, on coupe les
@@ -540,7 +810,7 @@ fn pause_shortcuts(app: AppHandle, paused: bool) -> Result<(), String> {
         app.global_shortcut().unregister_all().map_err(|e| e.to_string())
     } else {
         let s = lock(&app.state::<AppState>().settings).clone();
-        apply_shortcuts(&app, &s.shortcut_save, &s.shortcut_open)
+        apply_shortcuts_from(&app, &s)
     }
 }
 
@@ -560,10 +830,10 @@ fn set_settings(app: AppHandle, settings: Settings) -> Result<Settings, String> 
     let new = settings.sanitized();
     let old = lock(&state.settings).clone();
 
-    if new.shortcut_save != old.shortcut_save || new.shortcut_open != old.shortcut_open {
-        if let Err(e) = apply_shortcuts(&app, &new.shortcut_save, &new.shortcut_open) {
+    if new.shortcut_save != old.shortcut_save || new.shortcut_open != old.shortcut_open || new.shortcut_resume != old.shortcut_resume {
+        if let Err(e) = apply_shortcuts_from(&app, &new) {
             // On remet les anciens pour ne jamais rester sans raccourci.
-            let _ = apply_shortcuts(&app, &old.shortcut_save, &old.shortcut_open);
+            let _ = apply_shortcuts_from(&app, &old);
             return Err(e);
         }
     }
@@ -650,8 +920,8 @@ async fn open_item(app: AppHandle, id: String, item: String) -> Result<RestoreRe
         let state = handle.state::<AppState>();
         let ctx = lock(&state.store).get(&id).cloned().ok_or("Ce contexte n'existe plus.")?;
         let sel: HashSet<String> = [item].into_iter().collect();
-        let actions = restore::plan(&ctx, Some(&sel), false);
-        Ok(restore::execute(&Osascript::default(), &actions, &own_bundle(&handle)))
+        let actions = restore::plan(&ctx, Some(&sel), false, &screens(&handle));
+        Ok(restore::execute(&Osascript::default(), &actions, &own_bundle(&handle), &restore::Timing::default()))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -681,6 +951,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_window(app, "main");
         }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
         .plugin(
             tauri_plugin_global_shortcut::Builder::<tauri::Wry>::new()
@@ -708,12 +979,20 @@ pub fn run() {
                 note: Mutex::new(None),
                 shortcuts: Mutex::new(Shortcuts::default()),
                 update: Mutex::new(None),
+                installable: Mutex::new(None),
+                installing: Mutex::new(false),
+                auto_running: Mutex::new(false),
             });
 
-            if let Err(e) = apply_shortcuts(&handle, &settings.shortcut_save, &settings.shortcut_open) {
+            if let Err(e) = apply_shortcuts_from(&handle, &settings) {
                 // Raccourci personnalisé indisponible : on retombe sur ceux par défaut.
                 eprintln!("{e}");
-                let _ = apply_shortcuts(&handle, settings::DEFAULT_SAVE_SHORTCUT, settings::DEFAULT_OPEN_SHORTCUT);
+                let _ = apply_shortcuts(
+                    &handle,
+                    settings::DEFAULT_SAVE_SHORTCUT,
+                    settings::DEFAULT_OPEN_SHORTCUT,
+                    settings::DEFAULT_RESUME_SHORTCUT,
+                );
             }
             apply_dock(&handle, settings.show_in_dock);
             setup_tray(&handle)?;
@@ -725,11 +1004,12 @@ pub fn run() {
             // Mise à jour : au plus une vérification par jour, en arrière-plan.
             if settings.check_updates && now_ms().saturating_sub(settings.last_update_check) > 20 * 3600 * 1000 {
                 let h = handle.clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_secs(8));
-                    let _ = run_update_check(&h);
+                tauri::async_runtime::spawn(async move {
+                    tokio_sleep_ms(8000).await;
+                    let _ = run_update_check(&h).await;
                 });
             }
+            start_watcher(handle.clone());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -763,6 +1043,9 @@ pub fn run() {
             ignore_app,
             check_updates,
             get_update,
+            install_update,
+            resume_last,
+            mark_seen,
             check_permissions,
             open_privacy_pane,
             reveal_data,

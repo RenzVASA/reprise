@@ -63,6 +63,7 @@ pub fn full_capture(r: &dyn Runner, apps: &[RunningApp], own_bundle: &str, ignor
             label: a.name.clone(),
             value: a.bundle_id.clone().unwrap_or_else(|| a.name.clone()),
             group: None,
+            frames: Vec::new(),
         });
     }
 
@@ -85,6 +86,7 @@ pub fn full_capture(r: &dyn Runner, apps: &[RunningApp], own_bundle: &str, ignor
                         label: t.title,
                         value: t.url,
                         group: Some(t.window),
+                        frames: t.frame.into_iter().collect(),
                     });
                 }
             }
@@ -103,7 +105,7 @@ pub fn full_capture(r: &dyn Runner, apps: &[RunningApp], own_bundle: &str, ignor
     if apps.iter().any(|a| a.bundle_id.as_deref() == Some("com.apple.finder")) {
         match r.run(script::FINDER_FOLDERS, &[]) {
             Ok(out) => {
-                for p in script::parse_folders(&out) {
+                for (p, frame) in script::parse_folders(&out) {
                     let path = if p.len() > 1 { p.trim_end_matches('/').to_string() } else { p };
                     if seen_paths.insert(path.clone()) {
                         items.push(Item {
@@ -114,6 +116,7 @@ pub fn full_capture(r: &dyn Runner, apps: &[RunningApp], own_bundle: &str, ignor
                             label: script::file_name(&path),
                             value: path,
                             group: None,
+                            frames: frame.into_iter().collect(),
                         });
                     }
                 }
@@ -123,27 +126,38 @@ pub fn full_capture(r: &dyn Runner, apps: &[RunningApp], own_bundle: &str, ignor
         }
     }
 
-    // 4. Les fichiers ouverts (via l'Accessibilité).
-    match r.run(script::DOCUMENTS, &[]) {
+    // 4. Les fichiers ouverts et la place des fenêtres (via l'Accessibilité).
+    match r.run(script::WINDOWS, &[]) {
         Ok(out) => {
-            let (docs, ax_denied) = script::parse_documents(&out);
+            let (wins, ax_denied) = script::parse_windows(&out);
             if ax_denied {
                 push_warning(AX_WARNING.into(), &mut warnings);
             }
-            for d in docs {
-                if d.bundle_id.as_deref() == Some(own_bundle) || d.bundle_id.as_deref().is_some_and(is_ignored) {
+            for w in wins {
+                let bid = w.bundle_id.as_deref().unwrap_or("");
+                if bid == own_bundle || is_ignored(bid) {
                     continue;
                 }
-                if seen_paths.insert(d.path.clone()) {
-                    items.push(Item {
-                        id: new_id(),
-                        kind: ItemKind::Document,
-                        app_name: d.app_name,
-                        bundle_id: d.bundle_id,
-                        label: script::file_name(&d.path),
-                        value: d.path,
-                        group: None,
-                    });
+                // Les navigateurs et le Finder ont déjà leur cadre, lu par leur propre script.
+                let has_own_frames = bid == "com.apple.finder" || script::browser_family(bid).is_some();
+                if let (Some(frame), false) = (w.frame.clone(), has_own_frames) {
+                    if let Some(app) = items.iter_mut().find(|i| i.kind == ItemKind::App && i.bundle_id.as_deref() == Some(bid)) {
+                        app.frames.push(frame);
+                    }
+                }
+                if let Some(path) = w.document {
+                    if bid != "com.apple.finder" && seen_paths.insert(path.clone()) {
+                        items.push(Item {
+                            id: new_id(),
+                            kind: ItemKind::Document,
+                            app_name: w.app_name,
+                            bundle_id: w.bundle_id,
+                            label: script::file_name(&path),
+                            value: path,
+                            group: None,
+                            frames: Vec::new(),
+                        });
+                    }
                 }
             }
         }
@@ -190,15 +204,17 @@ mod tests {
                 ]
                 .concat())
             } else if src.contains("com.apple.Safari") {
-                Ok([r(&["1", "https://a.fr", "A"]), r(&["2", "https://b.fr", "B"])].concat())
+                Ok([r(&["1", "https://a.fr", "A", "0,0,900,700"]), r(&["2", "https://b.fr", "B", ""])].concat())
             } else if src.contains("com.google.Chrome") {
                 Err(ScriptError::NotAuthorized)
             } else if src == script::FINDER_FOLDERS {
-                Ok(format!("/Users/moi/Projet/{RS}/Users/moi/Projet/{RS}"))
-            } else if src == script::DOCUMENTS {
+                Ok(format!("/Users/moi/Projet/{US}0,0,600,400{RS}/Users/moi/Projet/{RS}"))
+            } else if src == script::WINDOWS {
                 Ok([
-                    r(&["com.microsoft.VSCode", "Code", "file:///Users/moi/Projet/main.rs"]),
-                    r(&["com.apple.finder", "Finder", "file:///Users/moi/Projet/"]),
+                    r(&["com.microsoft.VSCode", "Code", "file:///Users/moi/Projet/main.rs", "main.rs — Projet", "0", "25", "1200", "800", "false"]),
+                    r(&["com.microsoft.VSCode", "Code", "", "Bienvenue", "100", "100", "700", "500", "true"]),
+                    r(&["com.apple.finder", "Finder", "file:///Users/moi/Projet/", "Projet", "0", "0", "600", "400", "false"]),
+                    r(&["com.apple.Safari", "Safari", "", "A", "0", "0", "900", "700", "false"]),
                 ]
                 .concat())
             } else {
@@ -219,6 +235,16 @@ mod tests {
         assert_eq!(snap.items.iter().filter(|i| i.kind == ItemKind::Folder).count(), 1);
         assert_eq!(snap.items.iter().filter(|i| i.kind == ItemKind::Document).count(), 1);
         assert_eq!(snap.warnings.len(), 1);
+        // Code : une seule fenêtre replaçable (l'autre est réduite) ; Safari garde son cadre de navigateur.
+        let code = snap.items.iter().find(|i| i.label == "Code").unwrap();
+        assert_eq!(code.frames.len(), 1);
+        assert_eq!(code.frames[0].title, "main.rs — Projet");
+        let safari = snap.items.iter().find(|i| i.label == "Safari").unwrap();
+        assert!(safari.frames.is_empty());
+        let tab_a = snap.items.iter().find(|i| i.value == "https://a.fr").unwrap();
+        assert_eq!(tab_a.frames.len(), 1);
+        let folder = snap.items.iter().find(|i| i.kind == ItemKind::Folder).unwrap();
+        assert_eq!(folder.frames[0].w, 600);
         assert!(snap.warnings[0].contains("Google Chrome"));
     }
 

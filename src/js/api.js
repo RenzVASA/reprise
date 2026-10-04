@@ -39,4 +39,7 @@ export const api = {
   ignoreApp: (bundleId, name) => call("ignore_app", { bundleId, name }),
   checkUpdates: () => call("check_updates"),
   getUpdate: () => call("get_update"),
+  installUpdate: () => call("install_update"),
+  resumeLast: () => call("resume_last"),
+  markSeen: (key, version = null) => call("mark_seen", { key, version }),
 };

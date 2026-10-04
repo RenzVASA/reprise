@@ -54,6 +54,16 @@ let contexts = [
     ],
   },
   {
+    id: "a1", name: "Sauvegarde auto", pinned: false, auto: true, note: "",
+    created_at: now - 0.4 * H, updated_at: now - 0.4 * H, last_restored_at: null, restore_count: 0, front_app: "Code",
+    items: [app("Code", "com.microsoft.VSCode"), app("Safari", S), tab("Safari", S, "MDN – Array.prototype.map()", "https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Global_Objects/Array/map")],
+  },
+  {
+    id: "a2", name: "Sauvegarde auto", pinned: false, auto: true, note: "",
+    created_at: now - 20 * H, updated_at: now - 20 * H, last_restored_at: null, restore_count: 0, front_app: "Aperçu",
+    items: [app("Aperçu", "com.apple.Preview"), doc("Aperçu", "com.apple.Preview", "/Users/moi/Documents/Lycée/Maths/Fiche suites.pdf")],
+  },
+  {
     id: "c4", name: "Organiser le voyage à Lisbonne", pinned: false,
     note: "",
     created_at: now - 4 * 24 * H, updated_at: now - 4 * 24 * H, last_restored_at: null, restore_count: 0, front_app: "Safari",
@@ -70,6 +80,8 @@ let settings = {
   shortcut_save: "Alt+Command+S", shortcut_open: "Alt+Command+R", font: "atkinson", text_scale: 100,
   tidy_by_default: false, show_note: true, show_in_dock: true, launch_at_login: false, theme: "auto",
   ignored_apps: [{ bundle_id: "com.apple.MobileSMS", name: "Messages" }], check_updates: true, last_update_check: 0,
+  shortcut_resume: "Alt+Shift+Command+R", auto_save: true, welcome_back: true, welcome_minutes: 20, seen: [],
+  last_version: new URLSearchParams(location.search).get("whatsnew") === "1" ? "1.0.0" : "1.1.0",
   onboarded: new URLSearchParams(location.search).get("onboarding") !== "1",
 };
 
@@ -97,9 +109,9 @@ const pendingSnapshot = {
 };
 
 const demoUpdate = {
-  current: "1.0.0", latest: "1.1.0", available: new URLSearchParams(location.search).get("update") === "1",
+  current: "1.1.0", latest: "1.2.0", available: new URLSearchParams(location.search).get("update") === "1", can_install: true,
   url: "https://github.com/RenzVASA/reprise/releases/latest", dmg_url: null,
-  notes: "- Choisir ce qu'on enregistre\n- Apps toujours ignorées\n- Vérification des mises à jour",
+  notes: "- Les onglets de Firefox sont enregistrés\n- Le Terminal se rouvre dans le bon dossier\n- Corbeille : un contexte supprimé reste 30 jours",
 };
 
 export const demo = {
@@ -112,6 +124,7 @@ export const demo = {
         if (args.patch.name != null) c.name = args.patch.name;
         if (args.patch.note != null) c.note = args.patch.note;
         if (args.patch.pinned != null) c.pinned = args.patch.pinned;
+        if (args.patch.auto != null) { c.auto = args.patch.auto; if (!c.auto) c.name = "Contexte gardé"; }
         emit("contexts-changed"); return clone(c);
       }
       case "delete_context": {
@@ -129,7 +142,22 @@ export const demo = {
       }
       case "save_capture": return null;
       case "cancel_capture": return null;
-      case "get_note": return { id: "c1", name: contexts[0].name, note: contexts[0].note };
+      case "get_note": return new URLSearchParams(location.search).get("welcome") === "1"
+        ? { id: "c1", name: contexts[0].name, note: contexts[0].note, mode: "welcome", away_ms: 2.3 * H }
+        : { id: "c1", name: contexts[0].name, note: contexts[0].note, mode: "note", away_ms: 0 };
+      case "resume_last": return null;
+      case "mark_seen":
+        if (args.key && !settings.seen.includes(args.key)) settings.seen.push(args.key);
+        if (args.version) settings.last_version = args.version;
+        return clone(settings);
+      case "install_update": {
+        const total = 3.1 * 1048576;
+        for (let d = 0; d <= total; d += total / 12) { await wait(120); emit("update-progress", { downloaded: d, total }); }
+        emit("update-installed");
+        await wait(400);
+        location.reload();
+        return null;
+      }
       case "close_note": return null;
       case "get_settings": return clone(settings);
       case "set_settings": settings = clone(args.settings); emit("settings-changed", clone(settings)); return clone(settings);
@@ -140,7 +168,7 @@ export const demo = {
       case "check_updates": await wait(600); return demoUpdate;
       case "get_update": return new URLSearchParams(location.search).get("update") === "1" ? demoUpdate : null;
       case "check_permissions": await wait(500); return { automation: "ok", accessibility: "denied" };
-      case "app_info": return { version: "1.0.0", data_path: "~/Library/Application Support/io.github.renzvasa.reprise/contexts.json" };
+      case "app_info": return { version: "1.1.0", data_path: "~/Library/Application Support/io.github.renzvasa.reprise/contexts.json" };
       default: return null;
     }
   },

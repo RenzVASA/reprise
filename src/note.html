@@ -12,12 +12,13 @@
   <article class="postit" data-tauri-drag-region>
     <header class="postit-head" data-tauri-drag-region>
       <span id="sign" class="postit-sign" aria-hidden="true"></span>
-      <span class="postit-kicker" data-tauri-drag-region>Tu en étais là</span>
+      <span id="kicker" class="postit-kicker" data-tauri-drag-region>Tu en étais là</span>
       <button id="close" class="postit-x" aria-label="Fermer"></button>
     </header>
     <h1 id="name" class="postit-name" data-tauri-drag-region></h1>
     <p id="text" class="postit-text" data-tauri-drag-region></p>
     <footer class="postit-foot">
+      <button id="later" class="postit-go ghost" hidden>Plus tard</button>
       <button id="go" class="postit-go">C'est reparti</button>
     </footer>
   </article>

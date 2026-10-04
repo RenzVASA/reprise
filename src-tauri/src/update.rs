@@ -19,6 +19,8 @@ pub struct UpdateInfo {
     pub dmg_url: Option<String>,
     /// Notes de version (texte de la Release).
     pub notes: String,
+    /// La mise à jour peut s'installer toute seule (sinon : page de téléchargement).
+    pub can_install: bool,
 }
 
 pub fn check(current: &str) -> Result<UpdateInfo, String> {
@@ -78,5 +80,6 @@ pub fn parse_release(json: &str, current: &str) -> Result<UpdateInfo, String> {
         url,
         dmg_url,
         notes,
+        can_install: false,
     })
 }

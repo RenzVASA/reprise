@@ -20,6 +20,7 @@ const P = {
   warn: '<path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.5v.01"/>',
   info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.01"/>',
   download: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/>',
+  shield: '<path d="M12 3.5l7 2.8v5.4c0 4.2-2.9 7.6-7 8.8-4.1-1.2-7-4.6-7-8.8V6.3z"/><path d="M9 12l2.2 2.2L15.5 10"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   plusCircle: '<circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/>',
 };
@@ -103,6 +104,14 @@ export function prettyShortcut(s) {
     else key = p.replace(/^key/, "").replace(/^digit/, "").toUpperCase();
   }
   return ["⌃", "⌥", "⇧", "⌘"].filter((m) => mods.has(m)).join("") + key;
+}
+
+/** « 2 h 15 », « 45 min » */
+export function duration(ms) {
+  const m = Math.round(ms / 60000);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60), r = m % 60;
+  return r ? `${h} h ${String(r).padStart(2, "0")}` : `${h} h`;
 }
 
 export function plural(n, one, many) {

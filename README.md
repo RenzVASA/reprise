@@ -29,7 +29,9 @@ Quand tu reviens, tout est mélangé, et tu perds vingt minutes à te souvenir d
 
 1. **Tu appuies sur ⌥⌘S.** Reprise photographie tes apps ouvertes, les onglets de tes navigateurs, tes dossiers du Finder et les fichiers ouverts dans tes apps.
 2. **Tu écris une phrase : « où j'en étais ».** C'est elle qui fait toute la différence le lendemain. Des débuts de phrase sont proposés pour ne jamais rester bloqué devant une page blanche.
-3. **Plus tard, tu cliques sur « Reprendre ».** Tout se rouvre à sa place, fenêtres de navigateur comprises, et ta phrase s'affiche sur un post-it en haut de l'écran.
+3. **Plus tard, tu cliques sur « Reprendre ».** Tout se rouvre, chaque fenêtre à sa place et à sa taille, et ta phrase s'affiche sur un post-it en haut de l'écran.
+
+Et si tu oublies d'appuyer sur ⌥⌘S ? Le **filet de sécurité** s'en occupe : Reprise sauvegarde toute seule quand tu verrouilles ton Mac, qu'il se met en veille ou que tu t'absentes. En revenant, un post-it te demande : « Tu étais sur… on reprend ? »
 
 <p align="center">
   <img src="docs/screenshots/capture.png" width="380" alt="La fenêtre de sauvegarde">
@@ -54,13 +56,14 @@ Reprise est utile à tout le monde, mais il a été pensé d'abord pour les pers
 | | |
 |---|---|
 | Capture | Apps ouvertes, onglets de Safari, Chrome, Brave, Edge, Arc, Vivaldi (fenêtre par fenêtre), dossiers du Finder, fichiers ouverts (Aperçu, Pages, Keynote, Numbers, TextEdit, Xcode, VS Code et beaucoup d'autres) |
-| Reprise | Rouvre tout, ou seulement ce que tu coches. Recrée les fenêtres de navigateur avec leurs onglets dans l'ordre |
+| Reprise | Rouvre tout, ou seulement ce que tu coches. Recrée les fenêtres de navigateur avec leurs onglets dans l'ordre, et remet chaque fenêtre à sa place et à sa taille, y compris sur un deuxième écran |
+| Filet de sécurité | Sauvegarde automatique au verrouillage, à la mise en veille ou après 5 minutes d'inactivité (les 3 dernières sont gardées), et post-it « Tu étais sur… » au retour |
 | Choix | Décocher des éléments au moment de sauvegarder, liste d'apps à ne jamais enregistrer |
 | Barre des menus | Sauvegarde et reprise des contextes récents sans ouvrir la fenêtre |
-| Mises à jour | Vérification automatique (une fois par jour au plus) ou à la demande, avec lien vers la nouvelle version |
-| Aide | Le bouton « i » explique ce que fait Reprise, ce qui est enregistré, comment ça marche et les raccourcis |
+| Mises à jour | Reprise prévient quand une nouvelle version sort, la télécharge, vérifie sa signature, l'installe et redémarre, en un clic |
+| Aide | Visite guidée au premier lancement, astuce à la première sauvegarde, et le bouton « i » qui explique tout |
 | Organisation | Recherche dans les noms, les notes et les onglets, épinglage, renommage, mise à jour d'un contexte avec ce qui est ouvert maintenant, suppression avec « Annuler » |
-| Raccourcis | ⌥⌘S pour sauvegarder, ⌥⌘R pour ouvrir Reprise, personnalisables. Dans la fenêtre : ↑ ↓ pour naviguer, Entrée pour reprendre, ⌘F pour chercher, ⌘N pour sauvegarder |
+| Raccourcis | ⌥⌘S pour sauvegarder, ⌥⌘R pour ouvrir Reprise, ⌥⇧⌘R pour reprendre le dernier contexte, personnalisables. Dans la fenêtre : ↑ ↓ pour naviguer, Entrée pour reprendre, ⌘F pour chercher, ⌘N pour sauvegarder |
 | Réglages | Lancement à l'ouverture de session, icône dans le Dock ou seulement dans la barre des menus, post-it activable |
 
 ## Installation
@@ -74,6 +77,22 @@ Reprise est utile à tout le monde, mais il a été pensé d'abord pour les pers
    ```
 
 4. Lance Reprise. Un petit accueil en trois étapes t'explique tout.
+
+### Vérifier que le fichier est authentique
+
+Chaque version publie l'**empreinte SHA-256** de son `.dmg` (dans le texte de la Release et dans un fichier `.sha256` à côté). C'est une sorte d'empreinte digitale : si le fichier a été modifié, même d'un seul octet, l'empreinte change complètement.
+
+```bash
+shasum -a 256 ~/Downloads/Reprise_1.0.0_aarch64.dmg
+```
+
+Compare le résultat avec l'empreinte affichée sur la page de la Release : les deux doivent être identiques.
+
+Le `.dmg` est fabriqué directement par GitHub Actions à partir du code public de ce dépôt, et GitHub signe sa provenance. Pour le vérifier (avec l'outil [GitHub CLI](https://cli.github.com)) :
+
+```bash
+gh attestation verify ~/Downloads/Reprise_1.0.0_aarch64.dmg -R RenzVASA/reprise
+```
 
 ### Les autorisations demandées
 
@@ -107,6 +126,14 @@ npm run dev          # lance Reprise en mode développement
 npm run build        # fabrique Reprise.app et le .dmg dans src-tauri/target/release/bundle/
 ```
 
+`npm run build` signe aussi l'archive de mise à jour : il lui faut la clé privée. Si tu l'as créée avec le script de publication, elle est dans `~/.tauri/reprise.key` :
+
+```bash
+export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/reprise.key)"
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$(cat ~/.tauri/reprise.password)"
+npm run build
+```
+
 Pour travailler le design sans lancer l'app : `npm run apercu`, puis ouvre <http://localhost:8765> dans un navigateur. Les pages utilisent alors des données de démonstration.
 
 ### Comment c'est construit
@@ -125,6 +152,7 @@ src-tauri/src/
   store.rs           le stockage des contextes
   settings.rs        les réglages
   update.rs          la recherche de nouvelle version sur GitHub
+  watch.rs           le filet de sécurité (verrouillage, veille, inactivité)
 ```
 
 Les tests du cœur se lancent avec `cargo test --manifest-path src-tauri/Cargo.toml`.
@@ -132,13 +160,22 @@ Les tests du cœur se lancent avec `cargo test --manifest-path src-tauri/Cargo.t
 ### Publier une nouvelle version
 
 1. Change le numéro de version dans `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` et `package.json`.
-2. Pousse un tag : `git tag v1.1.0 && git push origin v1.1.0`.
-3. GitHub Actions fabrique le `.dmg` et crée la Release tout seul.
+2. Ajoute une section pour cette version en haut de `CHANGELOG.md` : c'est ce texte qui s'affiche dans la fenêtre de mise à jour.
+3. Pousse un tag : `git tag v1.2.0 && git push origin v1.2.0`.
+4. GitHub Actions fabrique le `.dmg`, l'archive de mise à jour signée et `latest.json`, puis crée la Release. Les utilisateurs sont prévenus tout seuls.
+
+### Comment marchent les mises à jour
+
+Chaque Release contient un fichier `latest.json` qui annonce la dernière version. Reprise le lit, et si elle est plus récente, propose de l'installer. L'archive téléchargée est **signée** avec une clé privée que seul le propriétaire du dépôt possède (dans les secrets GitHub) ; Reprise vérifie cette signature avec la clé publique écrite dans `tauri.conf.json` avant de remplacer quoi que ce soit. Une archive modifiée par quelqu'un d'autre est refusée.
+
+**Ne perds pas `~/.tauri/reprise.key`** : sans elle, impossible de signer les prochaines versions, et il faudrait que tout le monde réinstalle à la main.
 
 ## Idées pour la suite
 
-- Sauvegarde automatique quand l'écran se verrouille (« filet de sécurité »).
-- Rappel doux si un contexte épinglé n'a pas été repris depuis longtemps.
+- Les onglets de Firefox, lus dans son fichier de session.
+- Le Terminal et VS Code rouverts dans le bon dossier.
+- Une mini-liste de prochaines étapes à cocher sur le post-it.
+- Une corbeille : un contexte supprimé reste 30 jours.
 - Export et import des contextes.
 
 ## Crédits

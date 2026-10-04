@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Reprise",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "identifier": "io.github.renzvasa.reprise",
   "build": {
     "frontendDist": "../src"
@@ -44,7 +44,7 @@
         "title": "Tu en étais là",
         "url": "note.html",
         "width": 360,
-        "height": 210,
+        "height": 230,
         "resizable": false,
         "maximizable": false,
         "minimizable": false,
@@ -63,7 +63,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "category": "Productivity",
     "shortDescription": "Sauvegarde ton contexte de travail, reprends-le en un clic.",
     "longDescription": "Reprise photographie tes apps, onglets, dossiers et fichiers ouverts avec une note « où j'en étais », puis remet tout en place d'un clic.",
@@ -79,6 +82,15 @@
       "minimumSystemVersion": "11.0",
       "signingIdentity": "-",
       "entitlements": "./Entitlements.plist"
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMxOTMzM0Q3ODlBNTZCRDEKUldUUmE2V0oxek9Ud2FYYkJPb0pZdEtvUUVPbGF1UUZGS3Z5UFEzNGQxUXdrOThxajg0eWVwUXQK",
+      "endpoints": [
+        "https://github.com/RenzVASA/reprise/releases/latest/download/latest.json"
+      ]
     }
   }
 }

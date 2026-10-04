@@ -142,6 +142,7 @@ async function save() {
   setSaveLabel();
   try {
     await api.saveCapture(nameEl.value, noteEl.value, excluded.size ? [...excluded] : null);
+    dismissTip();
     reset();
   } catch (e) {
     saving = false;
@@ -226,9 +227,27 @@ on("capture-start", () => { reset(); refresh(); setTimeout(() => noteEl.focus(),
 on("capture-ready", () => refresh());
 window.addEventListener("focus", () => noteEl.focus());
 
+let tipSeen = true;
+
+function showTip(on) {
+  $("#tip").hidden = !on;
+  document.body.classList.toggle("has-tip", on);
+}
+
+function dismissTip() {
+  if (tipSeen) return;
+  tipSeen = true;
+  showTip(false);
+  api.markSeen("capture").catch(() => {});
+}
+
+$("#tip-ok").addEventListener("click", () => { dismissTip(); noteEl.focus(); });
+
 (async function start() {
   $("#cap-sign").innerHTML = repeatSign();
-  await initPrefs();
+  const prefs = await initPrefs();
+  tipSeen = !prefs || (prefs.seen || []).includes("capture");
+  showTip(!tipSeen);
   reset();
   await refresh();
   noteEl.focus();
