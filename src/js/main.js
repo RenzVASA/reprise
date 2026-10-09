@@ -936,7 +936,7 @@ function renderInfo() {
       <h3>Ce qui est enregistré</h3>
       <ul>
         <li>Les <strong>apps</strong> ouvertes (celles qui ont une icône dans le Dock).</li>
-        <li>Les <strong>onglets</strong> de Safari, Chrome, Brave, Edge, Arc et Vivaldi, fenêtre par fenêtre.</li>
+        <li>Les <strong>onglets</strong> de Safari, Chrome, Brave, Edge, Arc, Vivaldi, Opera et Opera GX, fenêtre par fenêtre.</li>
         <li>Les <strong>dossiers</strong> ouverts dans le Finder.</li>
         <li>Les <strong>fichiers</strong> ouverts dans tes apps (PDF, Pages, Keynote, VS Code…), si l'accès Accessibilité est autorisé.</li>
         <li>La <strong>place et la taille</strong> de chaque fenêtre, y compris sur un deuxième écran. Si cet écran n'est plus branché, la fenêtre reste sur l'écran principal.</li>

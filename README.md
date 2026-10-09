@@ -55,7 +55,7 @@ Reprise est utile à tout le monde, mais il a été pensé d'abord pour les pers
 
 | | |
 |---|---|
-| Capture | Apps ouvertes, onglets de Safari, Chrome, Brave, Edge, Arc, Vivaldi (fenêtre par fenêtre), dossiers du Finder, fichiers ouverts (Aperçu, Pages, Keynote, Numbers, TextEdit, Xcode, VS Code et beaucoup d'autres) |
+| Capture | Apps ouvertes, onglets de Safari, Chrome, Brave, Edge, Arc, Vivaldi, Opera, Opera GX (fenêtre par fenêtre), dossiers du Finder, fichiers ouverts (Aperçu, Pages, Keynote, Numbers, TextEdit, Xcode, VS Code et beaucoup d'autres) |
 | Reprise | Rouvre tout, ou seulement ce que tu coches. Recrée les fenêtres de navigateur avec leurs onglets dans l'ordre, et remet chaque fenêtre à sa place et à sa taille, y compris sur un deuxième écran |
 | Filet de sécurité | Sauvegarde automatique au verrouillage, à la mise en veille ou après 5 minutes d'inactivité (les 3 dernières sont gardées), et post-it « Tu étais sur… » au retour |
 | Choix | Décocher des éléments au moment de sauvegarder, liste d'apps à ne jamais enregistrer |

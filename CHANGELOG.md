@@ -1,5 +1,12 @@
 # Nouveautés de Reprise
 
+## 1.1.1
+
+- Opera et Opera GX sont reconnus : leurs onglets sont sauvegardés et rouverts, fenêtre par fenêtre.
+- Les onglets se rouvrent de façon bien plus fiable : Reprise attend que le navigateur soit vraiment lancé avant de recréer ses fenêtres, et un onglet qui coince n'empêche plus les autres de s'ouvrir.
+- Les pages internes (« Nouvel onglet », Favoris…) ne bloquent plus la réouverture des autres onglets.
+- Si un onglet n'a vraiment pas pu être rouvert, Reprise le dit, avec le nombre exact.
+
 ## 1.1.0
 
 - Les fenêtres reviennent à leur place et à leur taille, y compris sur un deuxième écran.

@@ -31,7 +31,7 @@ pub fn plan(ctx: &Context, selected: Option<&HashSet<String>>, tidy: bool, scree
 
     // Fenêtres de navigateur : (bundle, n° de fenêtre) → URL, dans l'ordre d'apparition.
     let mut windows: Vec<(String, String, u32, Vec<String>, Option<Frame>)> = Vec::new();
-    for it in ctx.items.iter().filter(|i| i.kind == ItemKind::Tab && picked(&i.id)) {
+    for it in ctx.items.iter().filter(|i| i.kind == ItemKind::Tab && picked(&i.id) && reopenable(&i.value)) {
         let Some(bid) = it.bundle_id.clone() else { continue };
         let g = it.group.unwrap_or(1);
         let frame = it.frames.first().filter(|f| keep(f)).cloned();
@@ -78,6 +78,14 @@ pub fn plan(ctx: &Context, selected: Option<&HashSet<String>>, tidy: bool, scree
         }
     }
     actions
+}
+
+/// Les pages internes des navigateurs (nouvel onglet, favoris, réglages…) ne se rouvrent
+/// pas depuis l'extérieur, et une seule d'entre elles suffit à faire échouer `open` pour
+/// tous les onglets. On ne rouvre que les vraies pages.
+pub fn reopenable(url: &str) -> bool {
+    let u = url.trim().to_ascii_lowercase();
+    u.starts_with("http://") || u.starts_with("https://") || u.starts_with("file://")
 }
 
 /// Combien de temps on laisse aux apps pour ouvrir leurs fenêtres avant de les replacer.
@@ -156,22 +164,36 @@ pub fn execute(r: &dyn Runner, actions: &[Action], own_bundle: &str, timing: &Ti
                     continue;
                 }
                 // 1er essai : recréer la fenêtre avec AppleScript (garde le regroupement et la place).
+                // Le script dit quelles URL n'ont pas pu être ouvertes : on ne rouvre que celles-là.
                 let mut args = vec![frame.as_ref().map(|f| f.to_arg()).unwrap_or_default()];
                 args.extend(urls.iter().cloned());
-                let scripted = family
+                let scripted: Option<Vec<String>> = family
                     .and_then(|f| script::open_tabs_script(f, bundle_id))
-                    .map(|src| r.run(&src, &args).is_ok())
-                    .unwrap_or(false);
-                // Sinon : `open -b navigateur url1 url2 …` (marche avec presque tout, Firefox compris).
-                let ok = scripted || {
+                    .and_then(|src| r.run(&src, &args).ok())
+                    .map(|out| {
+                        script::parse_failed(&out)
+                            .into_iter()
+                            .filter_map(|n| urls.get(n - 1).cloned())
+                            .collect()
+                    });
+                // Sinon (ou pour les URL restantes) : `open -b navigateur url1 url2 …`,
+                // qui marche avec presque tout, Firefox compris.
+                let rest: Vec<String> = scripted.clone().unwrap_or_else(|| urls.clone());
+                let rest_ok = rest.is_empty() || {
                     let mut args: Vec<&str> = vec!["-b", bundle_id.as_str()];
-                    args.extend(urls.iter().map(|u| u.as_str()));
+                    args.extend(rest.iter().map(|u| u.as_str()));
                     script::open(&args).is_ok()
                 };
-                if ok {
+                if rest_ok {
                     report.opened += urls.len() as u32;
                 } else {
-                    report.failures.push(format!("Les onglets de {browser} n'ont pas pu être rouverts."));
+                    let missing = rest.len() as u32;
+                    report.opened += urls.len() as u32 - missing;
+                    report.failures.push(if missing as usize == urls.len() {
+                        format!("Les onglets de {browser} n'ont pas pu être rouverts.")
+                    } else {
+                        format!("{missing} onglet(s) de {browser} n'ont pas pu être rouverts.")
+                    });
                 }
             }
         }
@@ -278,6 +300,49 @@ mod tests {
         assert!(p.iter().any(|a| matches!(a, Action::OpenTabs { frame: Some(f), .. } if f.x == 20)));
         assert!(p.iter().any(|a| matches!(a, Action::OpenFolder { frame: Some(f), .. } if f.x == 30)));
         assert_eq!(place_args("b", &[fr("T", 1)]), vec!["b", "T", "1", "40", "900", "700"]);
+    }
+
+    #[test]
+    fn internal_pages_are_skipped() {
+        let mut c = ctx();
+        c.items[2].value = "chrome://newtab/".into();
+        c.items.push(item("t4", ItemKind::Tab, "com.apple.Safari", "favorites://", Some(2)));
+        let p = plan(&c, None, false, &[]);
+        let tabs: Vec<_> = p
+            .iter()
+            .filter_map(|a| match a {
+                Action::OpenTabs { urls, .. } => Some(urls.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(tabs, vec![vec!["https://b.fr".to_string()], vec!["https://c.fr".to_string()]]);
+        assert!(reopenable(" HTTPS://x.fr") && reopenable("file:///Users/a.pdf") && !reopenable("about:blank"));
+    }
+
+    struct Fake(std::cell::RefCell<Vec<Vec<String>>>, Result<String, script::ScriptError>);
+    impl Runner for Fake {
+        fn run(&self, _s: &str, a: &[String]) -> Result<String, script::ScriptError> {
+            self.0.borrow_mut().push(a.to_vec());
+            self.1.clone()
+        }
+    }
+
+    #[test]
+    fn tab_script_reports_what_it_opened() {
+        let a = vec![Action::OpenTabs {
+            browser: "Chrome".into(),
+            bundle_id: "com.google.Chrome".into(),
+            family: Some(BrowserFamily::Chromium),
+            urls: vec!["https://a.fr".into(), "https://b.fr".into()],
+            frame: None,
+        }];
+        let f = Fake(Default::default(), Ok(String::new()));
+        let r = execute(&f, &a, "me", &Timing::default());
+        assert_eq!((r.opened, r.failures.len()), (2, 0));
+        assert_eq!(f.0.borrow()[0], vec!["", "https://a.fr", "https://b.fr"]);
+        assert_eq!(script::parse_failed("2"), vec![2]);
+        assert_eq!(script::parse_failed(" 1,3\n"), vec![1, 3]);
+        assert!(script::parse_failed("").is_empty());
     }
 
     #[test]

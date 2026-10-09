@@ -1,6 +1,6 @@
 [package]
 name = "reprise"
-version = "1.1.0"
+version = "1.1.1"
 description = "Sauvegarde ton contexte de travail en un raccourci, reprends-le en un clic."
 authors = ["RenzVASA"]
 license = "MIT"

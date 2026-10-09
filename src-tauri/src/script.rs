@@ -201,7 +201,7 @@ const SAFARI_TABS: &str = r#"on run argv
 	return out
 end run"#;
 
-/// Onglets des navigateurs Chromium (Chrome, Brave, Edge, Arc, Vivaldi…). Mêmes champs.
+/// Onglets des navigateurs Chromium (Chrome, Brave, Edge, Arc, Vivaldi, Opera…). Mêmes champs.
 const CHROMIUM_TABS: &str = r#"on run argv
 	set US to character id 31
 	set RS to character id 30
@@ -305,37 +305,23 @@ end run"#;
 
 // ──────────────────────────── Scripts de restauration ───────────────────────────
 
-/// Ouvre une nouvelle fenêtre Safari. Argument 1 : cadre « x,y,l,h » ou vide ; puis les URL.
-const SAFARI_OPEN: &str = r#"on run argv
-	tell application id "__BUNDLE__"
-		make new document with properties {URL:(item 2 of argv)}
-		set w to front window
-		repeat with i from 3 to count of argv
-			tell w to make new tab at end of tabs with properties {URL:(item i of argv)}
-		end repeat
-		if (item 1 of argv) is not "" then
-			try
-				set AppleScript's text item delimiters to ","
-				set f to text items of (item 1 of argv)
-				set AppleScript's text item delimiters to ""
-				set x to (item 1 of f) as integer
-				set y to (item 2 of f) as integer
-				set bounds of w to {x, y, x + ((item 3 of f) as integer), y + ((item 4 of f) as integer)}
-			end try
-		end if
-		activate
-	end tell
-end run"#;
+// Les deux scripts suivants reçoivent : argument 1 = cadre « x,y,l,h » ou vide, puis les URL.
+// Ils lancent le navigateur et attendent qu'il soit prêt (sinon la première commande échoue
+// quand il était fermé), ouvrent chaque onglet indépendamment (une URL refusée n'empêche
+// pas les suivantes) et renvoient les numéros des URL qui n'ont pas pu être ouvertes,
+// séparés par des virgules, pour que Reprise les rouvre autrement.
 
-/// Ouvre une nouvelle fenêtre Chromium. Mêmes arguments.
-const CHROMIUM_OPEN: &str = r#"on run argv
-	tell application id "__BUNDLE__"
-		set w to make new window
-		set URL of active tab of w to (item 2 of argv)
-		repeat with i from 3 to count of argv
-			tell w to make new tab with properties {URL:(item i of argv)}
-		end repeat
-		if (item 1 of argv) is not "" then
+/// Attend qu'un navigateur soit lancé et prêt à recevoir des commandes.
+const WAIT_LAUNCH: &str = r#"	tell application id "__BUNDLE__" to launch
+	repeat 50 times
+		if application id "__BUNDLE__" is running then exit repeat
+		delay 0.2
+	end repeat
+	delay 0.4
+"#;
+
+/// Place la fenêtre `w` si un cadre est donné.
+const SET_BOUNDS: &str = r#"		if (item 1 of argv) is not "" then
 			try
 				set AppleScript's text item delimiters to ","
 				set f to text items of (item 1 of argv)
@@ -345,9 +331,91 @@ const CHROMIUM_OPEN: &str = r#"on run argv
 				set bounds of w to {x, y, x + ((item 3 of f) as integer), y + ((item 4 of f) as integer)}
 			end try
 		end if
-		activate
+"#;
+
+const RETURN_FAILED: &str = r#"	set AppleScript's text item delimiters to ","
+	set out to failed as text
+	set AppleScript's text item delimiters to ""
+	return out
+"#;
+
+/// Ouvre une nouvelle fenêtre Safari avec ses onglets.
+/// Chaque ordre n'est donné qu'une seule fois : certains navigateurs renvoient une erreur
+/// alors qu'ils ont bien obéi, et réessayer ouvrirait des fenêtres en boucle. On vérifie
+/// donc en comptant les fenêtres et les onglets plutôt qu'en se fiant à l'erreur.
+const SAFARI_OPEN: &str = r#"on run argv
+	set failed to {}
+__WAIT__	tell application id "__BUNDLE__"
+__READY__		try
+			make new document with properties {URL:(item 2 of argv)}
+		end try
+__NEWWIN__		repeat with i from 3 to count of argv
+			set tc to count of tabs of w
+			try
+				tell w to make new tab at end of tabs with properties {URL:(item i of argv)}
+			on error
+				delay 0.3
+				if (count of tabs of w) is tc then set end of failed to (i - 1)
+			end try
+		end repeat
+__BOUNDS__		activate
 	end tell
-end run"#;
+__RETURN__end run"#;
+
+/// Ouvre une nouvelle fenêtre Chromium (Chrome, Brave, Edge, Arc, Vivaldi, Opera…) avec ses onglets.
+const CHROMIUM_OPEN: &str = r#"on run argv
+	set failed to {}
+__WAIT__	tell application id "__BUNDLE__"
+__READY__		try
+			make new window
+		end try
+__NEWWIN__		try
+			set URL of active tab of w to (item 2 of argv)
+		on error
+			set end of failed to 1
+		end try
+		repeat with i from 3 to count of argv
+			set tc to count of tabs of w
+			try
+				tell w to make new tab with properties {URL:(item i of argv)}
+			on error
+				delay 0.3
+				if (count of tabs of w) is tc then set end of failed to (i - 1)
+			end try
+		end repeat
+__BOUNDS__		activate
+	end tell
+__RETURN__end run"#;
+
+/// Attend que le navigateur réponde, et note combien il a de fenêtres.
+const READY: &str = r#"		set n0 to -1
+		repeat 40 times
+			try
+				set n0 to count of windows
+				exit repeat
+			on error
+				delay 0.25
+			end try
+		end repeat
+		if n0 is -1 then error "Le navigateur ne répond pas." number 9001
+"#;
+
+/// Vérifie qu'une fenêtre est bien apparue (sans jamais redemander), puis la garde dans `w`.
+const NEW_WINDOW: &str = r#"		set made to false
+		repeat 30 times
+			if (count of windows) > n0 then
+				set made to true
+				exit repeat
+			end if
+			delay 0.2
+		end repeat
+		if not made then error "Le navigateur n'a pas ouvert de fenêtre." number 9001
+		-- La nouvelle fenêtre passe devant : c'est la n° 1. On garde une référence fixe.
+		set w to window 1
+		try
+			set w to window id (id of w)
+		end try
+"#;
 
 /// Ouvre un dossier dans une nouvelle fenêtre du Finder, à sa place.
 /// Arguments : chemin POSIX, cadre « x,y,l,h » ou vide.
@@ -454,7 +522,12 @@ pub fn browser_family(bundle_id: &str) -> Option<BrowserFamily> {
         | "com.microsoft.edgemac.Beta"
         | "com.microsoft.edgemac.Dev"
         | "com.vivaldi.Vivaldi"
-        | "company.thebrowser.Browser" => Some(BrowserFamily::Chromium),
+        | "company.thebrowser.Browser"
+        | "com.operasoftware.Opera"
+        | "com.operasoftware.OperaGX"
+        | "com.operasoftware.OperaAir"
+        | "com.operasoftware.OperaNext"
+        | "com.operasoftware.OperaDeveloper" => Some(BrowserFamily::Chromium),
         _ => None,
     }
 }
@@ -489,7 +562,23 @@ pub fn open_tabs_script(family: BrowserFamily, bundle_id: &str) -> Option<String
         BrowserFamily::Safari => SAFARI_OPEN,
         BrowserFamily::Chromium => CHROMIUM_OPEN,
     };
-    Some(tpl.replace("__BUNDLE__", b))
+    Some(
+        tpl.replace("__WAIT__", WAIT_LAUNCH)
+            .replace("__READY__", READY)
+            .replace("__NEWWIN__", NEW_WINDOW)
+            .replace("__BOUNDS__", SET_BOUNDS)
+            .replace("__RETURN__", RETURN_FAILED)
+            .replace("__BUNDLE__", b),
+    )
+}
+
+/// Lit la réponse des scripts d'ouverture d'onglets : les numéros (à partir de 1) des URL
+/// qui n'ont pas pu être ouvertes.
+pub fn parse_failed(out: &str) -> Vec<usize> {
+    out.split(|c: char| c == ',' || c.is_whitespace())
+        .filter_map(|s| s.trim().parse::<usize>().ok())
+        .filter(|&n| n >= 1)
+        .collect()
 }
 
 // ─────────────────────────────── Lecture des sorties ───────────────────────────
@@ -778,6 +867,13 @@ mod tests {
         assert!(safe_bundle("com.apple.Safari").is_some());
         assert!(safe_bundle("evil\" & do shell script \"rm").is_none());
         assert!(tabs_script(BrowserFamily::Safari, "com.apple.Safari").unwrap().contains("\"com.apple.Safari\""));
+        assert_eq!(browser_family("com.operasoftware.OperaGX"), Some(BrowserFamily::Chromium));
+        // Jamais de « réessayer d'ouvrir une fenêtre » : un seul ordre, puis on compte.
+        for f in [BrowserFamily::Safari, BrowserFamily::Chromium] {
+            let src = open_tabs_script(f, "com.google.Chrome").unwrap();
+            assert_eq!(src.matches("make new window").count() + src.matches("make new document").count(), 1);
+            assert!(!src.contains("__"), "tous les morceaux sont remplacés");
+        }
         assert!(!open_tabs_script(BrowserFamily::Chromium, "com.google.Chrome").unwrap().contains("__BUNDLE__"));
     }
 }
