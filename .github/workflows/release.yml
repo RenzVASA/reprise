@@ -3,6 +3,8 @@
 #   - l'archive de mise à jour signée et le fichier latest.json, que Reprise lit pour
 #     se mettre à jour toute seule ;
 #   - une preuve de provenance signée par GitHub.
+# L'app est signée avec le certificat RenzVASA (secrets MACOS_CERT_P12 / MACOS_CERT_PASSWORD) :
+# macOS la reconnaît d'une version à l'autre et garde ses autorisations après une mise à jour.
 # Se lance quand tu pousses un tag « v1.1.0 », « v1.2.0 »… ou à la main (onglet Actions).
 name: Release
 
@@ -61,6 +63,38 @@ jobs:
       - name: Tests du cœur Rust
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
+      - name: Importer le certificat de signature RenzVASA
+        env:
+          P12: ${{ secrets.MACOS_CERT_P12 }}
+          PW: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          if [ -z "$P12" ]; then
+            echo "::warning::Pas de certificat : l'app sera signée de façon anonyme (les autorisations macOS se perdront à la mise à jour)."
+            exit 0
+          fi
+          KC="$RUNNER_TEMP/signature.keychain-db"
+          KCPW="$(openssl rand -hex 16)"
+          printf '%s' "$P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KCPW" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KCPW" "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KC" -P "$PW" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCPW" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          # Certificat auto-signé : on dit à ce Mac de GitHub de lui faire confiance pour signer.
+          /usr/bin/openssl pkcs12 -in "$RUNNER_TEMP/cert.p12" -nokeys -passin env:PW -out "$RUNNER_TEMP/cert.pem"
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign -k /Library/Keychains/System.keychain "$RUNNER_TEMP/cert.pem" \
+            || echo "::warning::Confiance non ajoutée, on essaie quand même."
+          rm -f "$RUNNER_TEMP/cert.p12"
+          ID="$(security find-identity -p codesigning "$KC" | awk '/RenzVASA/ {print $2; exit}')"
+          if [ -z "$ID" ]; then
+            security find-identity -p codesigning "$KC"
+            echo "::error::Certificat RenzVASA introuvable après import."
+            exit 1
+          fi
+          echo "APPLE_SIGNING_IDENTITY=$ID" >> "$GITHUB_ENV"
+          echo "Signature avec le certificat $ID"
+
       - name: Construire l'app, le .dmg et la mise à jour signée
         uses: tauri-apps/tauri-action@v0
         env:
@@ -68,6 +102,16 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: --target aarch64-apple-darwin
+
+      - name: Vérifier la signature de l'app
+        run: |
+          APP=src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Reprise.app
+          codesign --verify --deep --strict "$APP" || echo "::warning::codesign --verify a signalé un souci (voir ci-dessus)."
+          codesign -dvv "$APP" 2>&1 | grep -E "Authority|Signature|Identifier" || true
+          if [ -n "${APPLE_SIGNING_IDENTITY:-}" ] && codesign -dvv "$APP" 2>&1 | grep -q "Signature=adhoc"; then
+            echo "::error::L'app est restée signée de façon anonyme alors que le certificat est là."
+            exit 1
+          fi
 
       - name: Préparer les fichiers
         id: files

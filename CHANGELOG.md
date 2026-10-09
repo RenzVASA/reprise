@@ -1,5 +1,12 @@
 # Nouveautés de Reprise
 
+## 1.1.2
+
+- Reprise est maintenant signée avec le certificat RenzVASA : macOS la reconnaît d’une version à l’autre et garde tes autorisations (onglets, dossiers, fichiers ouverts) après les mises à jour. Après celle-ci, il te les redemandera une dernière fois.
+- Les onglets se rouvrent de façon fiable, une seule fenêtre par fenêtre sauvegardée.
+- Opera et Opera GX sont reconnus.
+- Les pages internes (« Nouvel onglet », Favoris…) ne bloquent plus la réouverture des autres onglets.
+
 ## 1.1.1
 
 - Opera et Opera GX sont reconnus : leurs onglets sont sauvegardés et rouverts, fenêtre par fenêtre.
