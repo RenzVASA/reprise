@@ -49,7 +49,7 @@ Reprise est utile à tout le monde, mais il a été pensé d'abord pour les pers
 - **Choisir ce qu'on garde** : au moment de sauvegarder, clique sur « 4 apps » ou « 12 onglets » et décoche ce qui n'a rien à voir.
 - **Apps jamais enregistrées** : Spotify, Messages, Discord… ne viennent plus jamais polluer tes contextes.
 - **Rouvrir seulement une partie** : décoche ce dont tu n'as plus besoin avant de reprendre.
-- **Mode clair, mode sombre**, et respect du réglage « Réduire les animations ».
+- **Mode clair, mode sombre** et **habillages** (Classique, Forêt, Océan, plus Halloween et Noël qui arrivent tout seuls à leur saison, icône du Dock comprise), avec respect du réglage « Réduire les animations ».
 
 ## Toutes les fonctions
 

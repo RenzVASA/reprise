@@ -1,5 +1,11 @@
 # Nouveautés de Reprise
 
+## 1.3.0
+
+- Habillages : en plus du Classique, Reprise peut s'habiller en Forêt ou en Océan (Réglages › Habillage). Chacun a son mode clair et son mode sombre, son surligneur, son post-it et son icône dans le Dock.
+- Habillages de saison : Halloween (du 15 octobre au 2 novembre) avec citrouilles et chauves-souris, et Noël (du 1er décembre au 6 janvier) avec un peu de neige. Ils arrivent et repartent tout seuls, et se coupent d'un clic.
+- L'icône du Dock change avec l'habillage, puis revient à l'originale.
+
 ## 1.2.0
 
 - Les sauvegardes automatiques sont rangées dans un dossier « Filet de sécurité », en haut de la liste. Il se plie et se déplie d'un clic, et un interrupteur l'active ou le désactive directement.

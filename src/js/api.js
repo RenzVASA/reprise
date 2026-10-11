@@ -42,4 +42,5 @@ export const api = {
   installUpdate: () => call("install_update"),
   resumeLast: () => call("resume_last"),
   markSeen: (key, version = null) => call("mark_seen", { key, version }),
+  setAppIcon: (style) => call("set_app_icon", { style }),
 };

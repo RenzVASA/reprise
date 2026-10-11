@@ -1,6 +1,6 @@
 // Fenêtre principale de Reprise.
 import { api, on } from "./api.js";
-import { applyPrefs, initPrefs } from "./prefs.js";
+import { applyPrefs, initPrefs, effectiveStyle, seasonFor } from "./prefs.js";
 import { esc, icon, repeatSign, ago, when, bucket, domain, hue, initial, prettyShortcut, plural } from "./util.js";
 import { startTour } from "./tour.js";
 
@@ -584,6 +584,37 @@ const FONTS = [
   ["system", "Police du système", "-apple-system, system-ui"],
 ];
 
+/** Habillages : id, nom, phrase, et quelques couleurs pour l'aperçu (papier, ruban, surligneur, point). */
+const STYLES = [
+  ["classique", "Classique", "Violet et surligneur jaune.", ["#F3F2FA", "#4A3ED0", "#FFE16B", "#F2C94C"], ["#12102A", "#8F84FF", "#6B5A1E", "#F2C94C"]],
+  ["foret", "Forêt", "Verts doux, comme un carnet de terrain.", ["#F1F4EE", "#2F7A4D", "#FFE08A", "#E9B949"], ["#0F1A13", "#6FCF97", "#5E5426", "#F2C94C"]],
+  ["ocean", "Océan", "Bleu profond et surligneur menthe.", ["#EEF4F8", "#0E6E9E", "#A6F0DA", "#2BB3A0"], ["#0B1722", "#5BC3F0", "#1F5A52", "#6EE7C8"]],
+  ["halloween", "Halloween", "Citrouilles, chauves-souris et violet.", ["#FBF3EA", "#D9581A", "#D9C2FF", "#F07A2A"], ["#140D17", "#FF8A3D", "#4A3566", "#FF8A3D"]],
+  ["noel", "Noël", "Rouge, sapin et un peu de neige.", ["#F7F3EE", "#B3243B", "#C9E8B4", "#C8283F"], ["#0F1714", "#FF6B7F", "#3B5A33", "#FF5A6E"]],
+];
+
+function styleCards(s) {
+  const dark = document.documentElement.dataset.theme === "dark"
+    || (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+  const shown = effectiveStyle(s);
+  const season = s.seasonal !== false ? seasonFor() : null;
+  const cards = STYLES.map(([id, name, line, light, darkc]) => {
+    const [paper, ribbon, marker, dot] = dark ? darkc : light;
+    return `
+      <button class="style-card" role="radio" aria-checked="${s.style === id}" data-set="style" data-value="${id}">
+        <span class="style-swatch" style="--sw-paper:${paper};--sw-ribbon:${ribbon};--sw-marker:${marker};--sw-dot:${dot}" aria-hidden="true">
+          <span class="sw-bar"></span><span class="sw-bar thin"></span><span class="sw-dots"><i></i><i></i></span><span class="sw-mark"></span>
+        </span>
+        <span class="style-name">${name}${shown === id ? ` <span class="style-now">affiché</span>` : ""}</span>
+        <span class="style-line">${line}</span>
+      </button>`;
+  }).join("");
+  const note = season && s.style !== season
+    ? `<p class="style-note">${icon("info")}<span>C'est la période ${season === "noel" ? "de Noël" : "d'Halloween"} : l'habillage de saison passe devant ton choix. Il s'en ira tout seul après, ou décoche « Habillages de saison » ci-dessous.</span></p>`
+    : "";
+  return `<div class="styles" role="radiogroup" aria-label="Habillage">${cards}</div>${note}`;
+}
+
 async function openSettings() {
   settingsError = "";
   try { state.settings = await api.settings(); } catch { /* garde la valeur connue */ }
@@ -656,6 +687,12 @@ function renderSettings() {
               `<button role="radio" aria-checked="${s.theme === v}" data-set="theme" data-value="${v}">${l}</button>`).join("")}
           </div>
         </div>
+      </div>
+
+      <div class="set-group">
+        <h3>Habillage</h3>
+        ${styleCards(s)}
+        ${toggleRow("seasonal", "Habillages de saison", "Halloween du 15 octobre au 2 novembre, Noël du 1er décembre au 6 janvier. L'icône du Dock change aussi, puis tout revient comme avant.")}
       </div>
 
       <div class="set-group">
@@ -758,6 +795,7 @@ settingsEl.addEventListener("click", async (e) => {
       break;
     case "font": saveSettings({ font: t.dataset.value }); break;
     case "theme": saveSettings({ theme: t.dataset.value }); break;
+    case "style": saveSettings({ style: t.dataset.value }); break;
     case "check-perms":
       perms = "loading"; renderSettings();
       try { perms = await api.permissions(); } catch { perms = null; }

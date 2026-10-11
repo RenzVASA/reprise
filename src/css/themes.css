@@ -1,0 +1,306 @@
+/* ─────────────────────────────────────────────────────────────
+   Habillages de Reprise. Le style choisi est posé sur <html data-style="…">
+   par prefs.js ; Halloween et Noël s'activent tout seuls aux bonnes dates
+   si « Habillages de saison » est coché. Fichier généré puis retouché à la main.
+   ───────────────────────────────────────────────────────────── */
+/* ── foret ── */
+:root[data-style="foret"] {
+  --paper: #F1F4EE;
+  --surface: #FFFFFF;
+  --surface-2: #E3EADF;
+  --ink: #17251C;
+  --ink-2: #4F6455;
+  --ink-3: #82947F;
+  --line: #D5DFD0;
+  --ribbon: #2F7A4D;
+  --ribbon-hover: #256640;
+  --ribbon-soft: #DCEFE2;
+  --ribbon-ink: #FFFFFF;
+  --marker: #FFE08A;
+  --marker-ink: #17251C;
+  --dot: #E9B949;
+  --dot-bright: #F5C443;
+  --postit-1: #F0F6C9;
+  --postit-2: #E4EFB0;
+  --postit-3: #D6E59A;
+  --postit-ink: #263016;
+  --postit-ink-2: #344020;
+  --postit-hover: rgba(38, 48, 22, .08);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style="foret"]:not([data-theme="light"]) {
+    --paper: #0F1A13;
+    --surface: #16241B;
+    --surface-2: #1E3025;
+    --ink: #E6F0E8;
+    --ink-2: #A3B8A8;
+    --ink-3: #6F8775;
+    --line: #263D2E;
+    --ribbon: #6FCF97;
+    --ribbon-hover: #8BDBAC;
+    --ribbon-soft: #1F3A2A;
+    --ribbon-ink: #0C1A11;
+    --marker: rgba(255, 214, 90, .28);
+    --marker-ink: #FFF4CC;
+    --dot: #F2C94C;
+    --dot-bright: #FFD23F;
+  color-scheme: dark;
+  }
+}
+:root[data-style="foret"][data-theme="dark"] {
+  --paper: #0F1A13;
+  --surface: #16241B;
+  --surface-2: #1E3025;
+  --ink: #E6F0E8;
+  --ink-2: #A3B8A8;
+  --ink-3: #6F8775;
+  --line: #263D2E;
+  --ribbon: #6FCF97;
+  --ribbon-hover: #8BDBAC;
+  --ribbon-soft: #1F3A2A;
+  --ribbon-ink: #0C1A11;
+  --marker: rgba(255, 214, 90, .28);
+  --marker-ink: #FFF4CC;
+  --dot: #F2C94C;
+  --dot-bright: #FFD23F;
+  color-scheme: dark;
+}
+/* ── ocean ── */
+:root[data-style="ocean"] {
+  --paper: #EEF4F8;
+  --surface: #FFFFFF;
+  --surface-2: #DFEAF2;
+  --ink: #102233;
+  --ink-2: #4A6175;
+  --ink-3: #8197AA;
+  --line: #D2E0EA;
+  --ribbon: #0E6E9E;
+  --ribbon-hover: #0B5B83;
+  --ribbon-soft: #D7EBF6;
+  --ribbon-ink: #FFFFFF;
+  --marker: #A6F0DA;
+  --marker-ink: #102233;
+  --dot: #2BB3A0;
+  --dot-bright: #3CCDB7;
+  --postit-1: #D8F6EE;
+  --postit-2: #BDEFE2;
+  --postit-3: #A4E5D4;
+  --postit-ink: #0F2A2A;
+  --postit-ink-2: #163838;
+  --postit-hover: rgba(15, 42, 42, .08);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style="ocean"]:not([data-theme="light"]) {
+    --paper: #0B1722;
+    --surface: #112131;
+    --surface-2: #172C40;
+    --ink: #E4EEF6;
+    --ink-2: #9DB3C6;
+    --ink-3: #6A8398;
+    --line: #1F364C;
+    --ribbon: #5BC3F0;
+    --ribbon-hover: #7ED0F4;
+    --ribbon-soft: #163650;
+    --ribbon-ink: #06141F;
+    --marker: rgba(110, 231, 200, .28);
+    --marker-ink: #E3FFF6;
+    --dot: #6EE7C8;
+    --dot-bright: #8DF0D6;
+  color-scheme: dark;
+  }
+}
+:root[data-style="ocean"][data-theme="dark"] {
+  --paper: #0B1722;
+  --surface: #112131;
+  --surface-2: #172C40;
+  --ink: #E4EEF6;
+  --ink-2: #9DB3C6;
+  --ink-3: #6A8398;
+  --line: #1F364C;
+  --ribbon: #5BC3F0;
+  --ribbon-hover: #7ED0F4;
+  --ribbon-soft: #163650;
+  --ribbon-ink: #06141F;
+  --marker: rgba(110, 231, 200, .28);
+  --marker-ink: #E3FFF6;
+  --dot: #6EE7C8;
+  --dot-bright: #8DF0D6;
+  color-scheme: dark;
+}
+/* ── halloween ── */
+:root[data-style="halloween"] {
+  --paper: #FBF3EA;
+  --surface: #FFFFFF;
+  --surface-2: #F3E4D3;
+  --ink: #241626;
+  --ink-2: #66506A;
+  --ink-3: #9A879C;
+  --line: #EADBCB;
+  --ribbon: #D9581A;
+  --ribbon-hover: #BC480F;
+  --ribbon-soft: #FCE3D2;
+  --ribbon-ink: #FFFFFF;
+  --marker: #D9C2FF;
+  --marker-ink: #241626;
+  --dot: #F07A2A;
+  --dot-bright: #FF8A3D;
+  --postit-1: #FFD3A1;
+  --postit-2: #FFBE78;
+  --postit-3: #FFAA57;
+  --postit-ink: #2B1305;
+  --postit-ink-2: #3E1E0A;
+  --postit-hover: rgba(43, 19, 5, .08);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style="halloween"]:not([data-theme="light"]) {
+    --paper: #140D17;
+    --surface: #1D1421;
+    --surface-2: #2A1C2F;
+    --ink: #F6ECF4;
+    --ink-2: #BFA9C2;
+    --ink-3: #85708A;
+    --line: #33233A;
+    --ribbon: #FF8A3D;
+    --ribbon-hover: #FFA163;
+    --ribbon-soft: #3A2219;
+    --ribbon-ink: #1A0D05;
+    --marker: rgba(170, 120, 255, .32);
+    --marker-ink: #F3E9FF;
+    --dot: #FF8A3D;
+    --dot-bright: #FFA163;
+  color-scheme: dark;
+  }
+}
+:root[data-style="halloween"][data-theme="dark"] {
+  --paper: #140D17;
+  --surface: #1D1421;
+  --surface-2: #2A1C2F;
+  --ink: #F6ECF4;
+  --ink-2: #BFA9C2;
+  --ink-3: #85708A;
+  --line: #33233A;
+  --ribbon: #FF8A3D;
+  --ribbon-hover: #FFA163;
+  --ribbon-soft: #3A2219;
+  --ribbon-ink: #1A0D05;
+  --marker: rgba(170, 120, 255, .32);
+  --marker-ink: #F3E9FF;
+  --dot: #FF8A3D;
+  --dot-bright: #FFA163;
+  color-scheme: dark;
+}
+/* ── noel ── */
+:root[data-style="noel"] {
+  --paper: #F7F3EE;
+  --surface: #FFFFFF;
+  --surface-2: #EFE6DC;
+  --ink: #1E1A1A;
+  --ink-2: #5F5552;
+  --ink-3: #978C87;
+  --line: #E6DCD2;
+  --ribbon: #B3243B;
+  --ribbon-hover: #971A30;
+  --ribbon-soft: #F6DADF;
+  --ribbon-ink: #FFFFFF;
+  --marker: #C9E8B4;
+  --marker-ink: #1E1A1A;
+  --dot: #C8283F;
+  --dot-bright: #E23B4E;
+  --postit-1: #FFF7EA;
+  --postit-2: #FDEBD3;
+  --postit-3: #F8DFC0;
+  --postit-ink: #3A0E16;
+  --postit-ink-2: #521522;
+  --postit-hover: rgba(58, 14, 22, .08);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style="noel"]:not([data-theme="light"]) {
+    --paper: #0F1714;
+    --surface: #15211C;
+    --surface-2: #1C2C25;
+    --ink: #F1EEE8;
+    --ink-2: #B2B9AF;
+    --ink-3: #7B867D;
+    --line: #24362E;
+    --ribbon: #FF6B7F;
+    --ribbon-hover: #FF8797;
+    --ribbon-soft: #3A1F24;
+    --ribbon-ink: #1B0A0D;
+    --marker: rgba(140, 214, 120, .30);
+    --marker-ink: #EFFFE8;
+    --dot: #FF5A6E;
+    --dot-bright: #FF7A8B;
+  color-scheme: dark;
+  }
+}
+:root[data-style="noel"][data-theme="dark"] {
+  --paper: #0F1714;
+  --surface: #15211C;
+  --surface-2: #1C2C25;
+  --ink: #F1EEE8;
+  --ink-2: #B2B9AF;
+  --ink-3: #7B867D;
+  --line: #24362E;
+  --ribbon: #FF6B7F;
+  --ribbon-hover: #FF8797;
+  --ribbon-soft: #3A1F24;
+  --ribbon-ink: #1B0A0D;
+  --marker: rgba(140, 214, 120, .30);
+  --marker-ink: #EFFFE8;
+  --dot: #FF5A6E;
+  --dot-bright: #FF7A8B;
+  color-scheme: dark;
+}
+
+/* ── Décorations de saison (discrètes, jamais par-dessus le texte) ── */
+:root[data-style="halloween"] .topbar::after,
+:root[data-style="noel"] .topbar::after {
+  content: ""; position: absolute; pointer-events: none;
+  top: 0; bottom: 0; left: 196px; width: 136px;
+  background-repeat: no-repeat;
+}
+:root[data-style="halloween"] .topbar::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 28%22%3E%3Cpath fill=%22%237A4C8E%22 d=%22M32 9c-1.5-3-1-6 0-8 1 2 1.5 5 0 8zM32 10c4-2 6-6 7-9 2 3 1 6 0 8 4-3 10-5 16-3-3 2-5 5-5 9 3-2 7-3 11-1-6 2-10 7-12 13-2-4-6-6-10-5 0-3-3-6-7-7-4 1-7 4-7 7-4-1-8 1-10 5-2-6-6-11-12-13 4-2 8-1 11 1 0-4-2-7-5-9 6-2 12 0 16 3-1-2-2-5 0-8 1 3 3 7 7 9z%22/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 28%22%3E%3Cpath fill=%22%237A4C8E%22 d=%22M32 9c-1.5-3-1-6 0-8 1 2 1.5 5 0 8zM32 10c4-2 6-6 7-9 2 3 1 6 0 8 4-3 10-5 16-3-3 2-5 5-5 9 3-2 7-3 11-1-6 2-10 7-12 13-2-4-6-6-10-5 0-3-3-6-7-7-4 1-7 4-7 7-4-1-8 1-10 5-2-6-6-11-12-13 4-2 8-1 11 1 0-4-2-7-5-9 6-2 12 0 16 3-1-2-2-5 0-8 1 3 3 7 7 9z%22/%3E%3C/svg%3E");
+  background-size: 38px 17px, 24px 11px;
+  background-position: 22px 8px, 92px 27px;
+  opacity: .8;
+}
+:root[data-style="noel"] .topbar::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Cg stroke=%22%238FB8D0%22 stroke-width=%221.8%22 stroke-linecap=%22round%22 fill=%22none%22%3E%3Cpath d=%22M12 2v20M3.3 7l17.4 10M3.3 17l17.4-10%22/%3E%3Cpath d=%22M9.5 3.5L12 6l2.5-2.5M9.5 20.5L12 18l2.5 2.5%22/%3E%3C/g%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Cg stroke=%22%238FB8D0%22 stroke-width=%221.8%22 stroke-linecap=%22round%22 fill=%22none%22%3E%3Cpath d=%22M12 2v20M3.3 7l17.4 10M3.3 17l17.4-10%22/%3E%3Cpath d=%22M9.5 3.5L12 6l2.5-2.5M9.5 20.5L12 18l2.5 2.5%22/%3E%3C/g%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Cg stroke=%22%238FB8D0%22 stroke-width=%221.8%22 stroke-linecap=%22round%22 fill=%22none%22%3E%3Cpath d=%22M12 2v20M3.3 7l17.4 10M3.3 17l17.4-10%22/%3E%3Cpath d=%22M9.5 3.5L12 6l2.5-2.5M9.5 20.5L12 18l2.5 2.5%22/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 17px, 12px, 14px;
+  background-position: 16px 9px, 62px 29px, 106px 13px;
+  opacity: .9;
+}
+.postit-deco { display: none; }
+:root[data-style="halloween"] .postit-deco,
+:root[data-style="noel"] .postit-deco {
+  display: block; position: absolute; left: 1rem; bottom: .75rem;
+  width: 2.1rem; height: 1.6rem; pointer-events: none;
+  background-repeat: no-repeat; background-size: contain; background-position: left bottom;
+  opacity: .9;
+}
+:root[data-style="halloween"] .postit-deco { background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 36%22%3E%3Crect x=%2218%22 y=%221%22 width=%224%22 height=%228%22 rx=%221.5%22 fill=%22%234C8A2E%22/%3E%3Cellipse cx=%2211%22 cy=%2221%22 rx=%2210%22 ry=%2213%22 fill=%22%23D9560B%22/%3E%3Cellipse cx=%2229%22 cy=%2221%22 rx=%2210%22 ry=%2213%22 fill=%22%23D9560B%22/%3E%3Cellipse cx=%2220%22 cy=%2221%22 rx=%229%22 ry=%2214%22 fill=%22%23FF7A1A%22/%3E%3C/svg%3E"); }
+:root[data-style="noel"] .postit-deco { background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 48 30%22%3E%3Cpath fill=%22%232F7A4D%22 d=%22M24 15C20 6 12 3 3 5c3 2 3 5 1 7 3 0 5 2 4 5 4-2 8-1 10 2 0-3 3-4 6-4zM24 15c4-9 12-12 21-10-3 2-3 5-1 7-3 0-5 2-4 5-4-2-8-1-10 2 0-3-3-4-6-4z%22/%3E%3Ccircle cx=%2221%22 cy=%2217%22 r=%223.4%22 fill=%22%23C8283F%22/%3E%3Ccircle cx=%2227%22 cy=%2217%22 r=%223.4%22 fill=%22%23C8283F%22/%3E%3Ccircle cx=%2224%22 cy=%2221.5%22 r=%223.4%22 fill=%22%23E23B4E%22/%3E%3C/svg%3E"); }
+
+/* Neige qui tombe doucement sur la barre du haut, à Noël. Coupée si « Réduire les animations ». */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-style="noel"] .topbar::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 340px; pointer-events: none;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(255,255,255,.9) 0 1.2px, transparent 1.6px),
+      radial-gradient(circle at 70% 60%, rgba(255,255,255,.8) 0 1px, transparent 1.4px),
+      radial-gradient(circle at 45% 80%, rgba(255,255,255,.7) 0 1.4px, transparent 1.8px);
+    background-size: 90px 60px, 130px 80px, 170px 70px;
+    animation: reprise-snow 14s linear infinite;
+    opacity: .55;
+  }
+  :root[data-style="noel"]:not([data-theme="dark"]) .topbar::before { filter: drop-shadow(0 0 1px rgba(80, 110, 130, .5)); }
+}
+@keyframes reprise-snow {
+  from { background-position: 0 -60px, 0 -80px, 0 -70px; }
+  to   { background-position: 30px 60px, -20px 80px, 15px 70px; }
+}

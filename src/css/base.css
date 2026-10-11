@@ -26,6 +26,10 @@
   --ribbon-ink: #FFFFFF;
   --marker: #FFE16B;
   --marker-ink: #1C1939;
+  --dot: #F2C94C;
+  --dot-bright: #FFD23F;
+  --postit-1: #FFE883; --postit-2: #FFE16B; --postit-3: #FBD957;
+  --postit-ink: #2A2410; --postit-ink-2: #3d3418; --postit-hover: rgba(42, 36, 16, .08);
   --danger: #C2334A;
   --ok: #1F8A5B;
   --shadow: 0 1px 0 rgba(28, 25, 57, .04), 0 8px 24px -12px rgba(28, 25, 57, .22);

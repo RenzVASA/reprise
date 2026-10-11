@@ -9,7 +9,7 @@ body { background: var(--surface); }
 .cap-head { display: flex; align-items: center; gap: .9rem; margin-bottom: 1.1rem; }
 .cap-sign { width: 1.25rem; height: 1.7rem; color: var(--ink); flex: none; }
 .cap-sign svg { width: 100%; height: 100%; }
-.cap-sign .dot { fill: #F2C94C; }
+.cap-sign .dot { fill: var(--dot); }
 .cap-head h1 { font-family: var(--font-display); font-size: 1.35rem; line-height: 1.2; margin: 0; letter-spacing: -.01em; }
 .cap-sub { margin: .1rem 0 0; font-size: .85rem; color: var(--ink-2); }
 

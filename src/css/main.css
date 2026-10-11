@@ -5,6 +5,7 @@ body { display: flex; flex-direction: column; }
 
 /* ── Barre du haut (sous les feux tricolores de macOS) ───── */
 .topbar {
+  position: relative;
   flex: none;
   height: 3.4rem;
   min-height: 52px;
@@ -15,7 +16,7 @@ body { display: flex; flex-direction: column; }
 }
 .brand { display: flex; align-items: center; gap: .55rem; width: calc(340px - 84px - 1rem); flex: none; }
 .brand-mark { width: .9rem; height: 1.2rem; color: var(--ink); }
-.brand-mark .dot { fill: #F2C94C; }
+.brand-mark .dot { fill: var(--dot); }
 .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; letter-spacing: -.01em; }
 
 .search { flex: 1; min-width: 10rem; max-width: 30rem; position: relative; display: flex; align-items: center; }
@@ -124,7 +125,7 @@ body { display: flex; flex-direction: column; }
 }
 .btn.resume { font-size: 1.05rem; padding: .7em 1.25em .7em 1.05em; border-radius: 12px; gap: .65em; }
 .btn.resume .repeat-sign { width: .8em; height: 1.05em; }
-.btn.resume .repeat-sign .dot { fill: #FFD23F; }
+.btn.resume .repeat-sign .dot { fill: var(--dot-bright); }
 .btn.resume.busy { pointer-events: none; }
 .resume-side { display: flex; flex-direction: column; gap: .2rem; }
 .resume-count { font-size: .85rem; color: var(--ink-2); }
@@ -179,7 +180,7 @@ input[type="checkbox"] { accent-color: var(--ribbon); width: 1rem; height: 1rem;
 .empty { height: 100%; display: grid; place-items: center; padding: 2rem; }
 .empty-card { max-width: 30rem; text-align: center; }
 .empty-sign { width: 4.2rem; height: 5.6rem; margin: 0 auto 1.4rem; color: var(--ink); }
-.empty-sign .dot { fill: #FFD23F; }
+.empty-sign .dot { fill: var(--dot-bright); }
 .empty h2 { font-family: var(--font-display); font-size: 1.7rem; line-height: 1.2; margin: 0 0 .7rem; letter-spacing: -.01em; }
 .empty p { color: var(--ink-2); margin: 0 auto 1.4rem; max-width: 26rem; }
 .keys { display: inline-flex; gap: .4rem; margin-bottom: 1.5rem; }
@@ -358,14 +359,14 @@ code { font: .88em ui-monospace, "SF Mono", Menlo, monospace; background: var(--
 /* ── Nouveautés ──────────────────────────────────────────── */
 .whatsnew { list-style: none; margin: 1rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .75rem; }
 .whatsnew li { display: flex; flex-direction: column; padding-left: 1.1rem; position: relative; }
-.whatsnew li::before { content: ""; position: absolute; left: 0; top: .5em; width: .45rem; height: .45rem; border-radius: 50%; background: #F2C94C; }
+.whatsnew li::before { content: ""; position: absolute; left: 0; top: .5em; width: .45rem; height: .45rem; border-radius: 50%; background: var(--dot); }
 .whatsnew span { font-size: .9rem; color: var(--ink-2); }
 
 /* ── Visite guidée ───────────────────────────────────────── */
 .tour { position: fixed; inset: 0; z-index: 100; }
 .tour-hole {
   position: fixed; border-radius: 12px;
-  box-shadow: 0 0 0 3px #FFD23F, 0 0 0 9999px rgba(18, 16, 42, .62);
+  box-shadow: 0 0 0 3px var(--dot-bright), 0 0 0 9999px rgba(18, 16, 42, .62);
   transition: left .22s ease, top .22s ease, width .22s ease, height .22s ease;
   pointer-events: none;
 }
@@ -384,3 +385,28 @@ code { font: .88em ui-monospace, "SF Mono", Menlo, monospace; background: var(--
 .tour-actions { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .9rem; }
 .tour-nav { display: flex; gap: .4rem; margin-left: auto; }
 .tour-skip { padding-left: 0; }
+
+/* ── Habillages ──────────────────────────────────────────── */
+.styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.2rem, 1fr)); gap: .5rem; margin-bottom: .4rem; }
+.style-card {
+  display: flex; flex-direction: column; gap: .15rem; text-align: left;
+  padding: .5rem .55rem .6rem; border-radius: var(--r-m);
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+.style-card:hover { border-color: var(--ink-3); }
+.style-card[aria-checked="true"] { border-color: var(--ribbon); box-shadow: 0 0 0 2px var(--ribbon-soft); }
+.style-swatch {
+  position: relative; display: block; height: 3.1rem; margin-bottom: .35rem;
+  border-radius: calc(var(--r-m) - 3px); background: var(--sw-paper);
+  border: 1px solid rgba(0, 0, 0, .06); overflow: hidden;
+}
+.sw-bar { position: absolute; top: .55rem; bottom: .55rem; left: .7rem; width: .55rem; border-radius: 2px; background: var(--sw-ribbon); }
+.sw-bar.thin { left: 1.45rem; width: .2rem; }
+.sw-dots { position: absolute; left: 1.9rem; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; gap: .32rem; }
+.sw-dots i { width: .48rem; height: .48rem; border-radius: 50%; background: var(--sw-dot); }
+.sw-mark { position: absolute; left: 3.1rem; right: .7rem; top: 50%; height: .7rem; margin-top: -.35rem; border-radius: .2rem .45rem .3rem .5rem; background: var(--sw-marker); opacity: .9; }
+.style-name { font-family: var(--font-display); font-weight: 700; font-size: .92rem; display: flex; align-items: center; gap: .35rem; }
+.style-now { font-family: var(--font-read); font-size: .68rem; font-weight: 700; color: var(--ribbon); background: var(--ribbon-soft); border-radius: 1em; padding: .05em .5em; }
+.style-line { font-size: .78rem; line-height: 1.35; color: var(--ink-2); }
+.style-note { display: flex; gap: .5rem; align-items: flex-start; margin: .3rem 0 .6rem; font-size: .82rem; color: var(--ink-2); }
+.style-note .icon { width: 1rem; height: 1rem; flex: none; margin-top: .1rem; color: var(--ribbon); }

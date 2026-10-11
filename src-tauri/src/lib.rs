@@ -494,10 +494,63 @@ fn start_watcher(app: AppHandle) {
 fn apply_dock(app: &AppHandle, show: bool) {
     let policy = if show { tauri::ActivationPolicy::Regular } else { tauri::ActivationPolicy::Accessory };
     let _ = app.set_activation_policy(policy);
+    // Réafficher l'icône dans le Dock remet l'icône d'origine : on remet celle de l'habillage.
+    apply_style_icon(app);
+}
+
+// ─────────────────────── Icône du Dock selon l'habillage ───────────────────────
+
+/// Habillage dont l'icône est affichée dans le Dock (choisi par la fenêtre principale).
+static DOCK_STYLE: Mutex<String> = Mutex::new(String::new());
+
+/// L'image de l'icône pour un habillage. `None` = l'icône d'origine de l'app.
+fn style_icon(style: &str) -> Option<&'static [u8]> {
+    match style {
+        "foret" => Some(&include_bytes!("../icons/styles/foret.png")[..]),
+        "ocean" => Some(&include_bytes!("../icons/styles/ocean.png")[..]),
+        "halloween" => Some(&include_bytes!("../icons/styles/halloween.png")[..]),
+        "noel" => Some(&include_bytes!("../icons/styles/noel.png")[..]),
+        _ => None,
+    }
+}
+
+/// Change l'icône de l'app dans le Dock tant qu'elle tourne (macOS remet l'icône
+/// d'origine quand l'app est fermée). Doit être appelé sur le fil principal.
+#[cfg(target_os = "macos")]
+fn set_dock_icon(png: Option<&'static [u8]>) {
+    use objc2::{AnyThread, MainThreadMarker};
+    use objc2_app_kit::{NSApplication, NSImage};
+    use objc2_foundation::NSData;
+    let Some(mtm) = MainThreadMarker::new() else { return };
+    let app = NSApplication::sharedApplication(mtm);
+    let image = png.and_then(|bytes| NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(bytes)));
+    // Sans image (habillage classique), macOS reprend l'icône de l'app.
+    unsafe { app.setApplicationIconImage(image.as_deref()) };
+}
+
+#[cfg(not(target_os = "macos"))]
+fn set_dock_icon(_png: Option<&'static [u8]>) {}
+
+fn apply_style_icon(app: &AppHandle) {
+    let png = style_icon(&lock(&DOCK_STYLE));
+    let _ = app.run_on_main_thread(move || set_dock_icon(png));
 }
 
 #[cfg(not(target_os = "macos"))]
 fn apply_dock(_app: &AppHandle, _show: bool) {}
+
+/// La fenêtre principale indique l'habillage affiché ; l'icône du Dock suit.
+#[tauri::command]
+fn set_app_icon(app: AppHandle, style: String) {
+    let style = if settings::STYLES.contains(&style.as_str()) { style } else { "classique".into() };
+    *lock(&DOCK_STYLE) = style;
+    apply_style_icon(&app);
+    // Au démarrage, macOS peut reposer l'icône d'origine un peu après : on repasse une fois.
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        apply_style_icon(&app);
+    });
+}
 
 // ───────────────────────────────── Commandes ─────────────────────────────────
 
@@ -1053,6 +1106,7 @@ pub fn run() {
             reveal_data,
             open_link,
             app_info,
+            set_app_icon,
         ])
         .build(tauri::generate_context!())
         .expect("impossible de démarrer Reprise")

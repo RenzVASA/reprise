@@ -49,7 +49,13 @@ pub struct Settings {
     pub seen: Vec<String>,
     /// Dernière version lancée, pour montrer les nouveautés après une mise à jour.
     pub last_version: String,
+    /// Habillage : "classique", "foret", "ocean", "halloween", "noel".
+    pub style: String,
+    /// Passer tout seul aux habillages de saison (Halloween, Noël) aux bonnes dates.
+    pub seasonal: bool,
 }
+
+pub const STYLES: &[&str] = &["classique", "foret", "ocean", "halloween", "noel"];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IgnoredApp {
@@ -79,6 +85,8 @@ impl Default for Settings {
             welcome_minutes: 20,
             seen: Vec::new(),
             last_version: String::new(),
+            style: "classique".into(),
+            seasonal: true,
         }
     }
 }
@@ -104,6 +112,9 @@ impl Settings {
         }
         if !["auto", "light", "dark"].contains(&self.theme.as_str()) {
             self.theme = "auto".into();
+        }
+        if !STYLES.contains(&self.style.as_str()) {
+            self.style = "classique".into();
         }
         if self.shortcut_save.trim().is_empty() {
             self.shortcut_save = DEFAULT_SAVE_SHORTCUT.into();

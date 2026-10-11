@@ -80,7 +80,7 @@ let settings = {
   shortcut_save: "Alt+Command+S", shortcut_open: "Alt+Command+R", font: "atkinson", text_scale: 100,
   tidy_by_default: false, show_note: true, show_in_dock: true, launch_at_login: false, theme: "auto",
   ignored_apps: [{ bundle_id: "com.apple.MobileSMS", name: "Messages" }], check_updates: true, last_update_check: 0,
-  shortcut_resume: "Alt+Shift+Command+R", auto_save: true, welcome_back: true, welcome_minutes: 20, seen: [],
+  shortcut_resume: "Alt+Shift+Command+R", auto_save: true, welcome_back: true, welcome_minutes: 20, seen: [], style: new URLSearchParams(location.search).get("style") || "classique", seasonal: true,
   last_version: new URLSearchParams(location.search).get("whatsnew") === "1" ? "1.0.0" : "1.1.0",
   onboarded: new URLSearchParams(location.search).get("onboarding") !== "1",
 };
