@@ -226,13 +226,14 @@ fn restore_internal(app: &AppHandle, id: &str, items: Option<Vec<String>>, tidy:
     Ok(report)
 }
 
-/// Les écrans branchés, en points (pour ne pas envoyer une fenêtre hors de l'écran).
+/// Les écrans branchés (pour ne pas envoyer une fenêtre hors de l'écran). En points sur Mac,
+/// en pixels réels sous Windows et Linux, comme les positions de fenêtres de chaque système.
 fn screens(app: &AppHandle) -> Vec<Screen> {
     app.available_monitors()
         .unwrap_or_default()
         .iter()
         .map(|m| {
-            let k = m.scale_factor().max(1.0);
+            let k = if cfg!(target_os = "macos") { m.scale_factor().max(1.0) } else { 1.0 };
             Screen {
                 x: (m.position().x as f64 / k).round() as i32,
                 y: (m.position().y as f64 / k).round() as i32,

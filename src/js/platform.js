@@ -56,6 +56,9 @@ export const T = {
   },
 }[OS];
 
+/** « Faire place nette » et la place des fenêtres : Mac et Windows (pas encore Linux). */
+export const canTidy = OS !== "linux";
+
 /** La touche des raccourcis de l'app : ⌘ sur Mac, Ctrl ailleurs. */
 export const mod = (e) => (isMac ? e.metaKey : e.ctrlKey);
 

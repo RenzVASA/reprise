@@ -4,7 +4,7 @@
 //! Chaque système fournit un `Launcher` (comment lancer une app ou ouvrir un fichier) ;
 //! ici on ne fait que décider quoi lancer, dans quel ordre.
 
-use crate::model::{new_id, now_ms, Item, ItemKind, RestoreReport, Snapshot};
+use crate::model::{new_id, now_ms, Frame, Item, ItemKind, RestoreReport, Snapshot};
 use crate::restore::Action;
 use crate::sessions::{self, Kind};
 use crate::sys;
@@ -30,8 +30,22 @@ fn push_warning(w: String, warnings: &mut Vec<String>) {
     }
 }
 
-/// Assemble la photo : apps, onglets (lus dans les sessions des navigateurs), dossiers, fichiers.
-pub fn build_snapshot(apps: &[FoundApp], folders: &[String], ignored: &[String], mut warnings: Vec<String>) -> Snapshot {
+/// Un dossier ouvert, avec la place de sa fenêtre si on la connaît.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FoundFolder {
+    pub path: String,
+    pub frame: Option<Frame>,
+}
+
+/// Assemble la photo : apps (et la place de leurs fenêtres), onglets (lus dans les sessions
+/// des navigateurs), dossiers, fichiers. `frames` : (identité de l'app, fenêtre).
+pub fn build_snapshot(
+    apps: &[FoundApp],
+    frames: &[(String, Frame)],
+    folders: &[FoundFolder],
+    ignored: &[String],
+    mut warnings: Vec<String>,
+) -> Snapshot {
     let is_ignored = |id: &str| ignored.iter().any(|i| i.eq_ignore_ascii_case(id));
     let mut items: Vec<Item> = Vec::new();
     let mut seen_apps: HashSet<String> = HashSet::new();
@@ -50,7 +64,7 @@ pub fn build_snapshot(apps: &[FoundApp], folders: &[String], ignored: &[String],
             label: a.name.clone(),
             value: a.id.clone(),
             group: None,
-            frames: Vec::new(),
+            frames: frames.iter().filter(|(id, _)| id.eq_ignore_ascii_case(&a.id)).map(|(_, f)| f.clone()).collect(),
         });
 
         // Onglets : une seule lecture par navigateur, même s'il a plusieurs fenêtres.
@@ -94,16 +108,16 @@ pub fn build_snapshot(apps: &[FoundApp], folders: &[String], ignored: &[String],
     }
 
     for f in folders {
-        if seen_paths.insert(f.to_ascii_lowercase()) {
+        if seen_paths.insert(f.path.to_ascii_lowercase()) {
             items.push(Item {
                 id: new_id(),
                 kind: ItemKind::Folder,
                 app_name: if cfg!(windows) { "Explorateur".into() } else { "Fichiers".into() },
                 bundle_id: None,
-                label: sys::file_name(f),
-                value: f.clone(),
+                label: sys::file_name(&f.path),
+                value: f.path.clone(),
                 group: None,
-                frames: Vec::new(),
+                frames: f.frame.iter().cloned().collect(),
             });
         }
     }
@@ -122,6 +136,30 @@ pub trait Launcher {
     fn launch(&self, id: &str, args: &[String]) -> Result<(), String>;
     /// Ouvre un fichier, un dossier ou une adresse avec l'app par défaut.
     fn open(&self, target: &str) -> Result<(), String>;
+    /// « Faire place nette » : réduit les fenêtres des autres apps. Rien par défaut.
+    fn hide_others(&self) {}
+    /// Remet les fenêtres de l'app `id` à leur place. Renvoie combien ont été placées.
+    /// `id` vide : les fenêtres de dossiers. Rien par défaut.
+    fn place(&self, _id: &str, _frames: &[Frame]) -> usize {
+        0
+    }
+    /// Le gestionnaire de fichiers, pour replacer ses fenêtres (vide si on ne sait pas).
+    fn file_manager_id(&self) -> &str {
+        ""
+    }
+}
+
+/// Combien de temps on laisse aux apps pour ouvrir leurs fenêtres avant de les replacer.
+pub struct Timing {
+    pub first_wait: Duration,
+    pub retry_wait: Duration,
+    pub attempts: u32,
+}
+
+impl Default for Timing {
+    fn default() -> Self {
+        Timing { first_wait: Duration::from_millis(1500), retry_wait: Duration::from_millis(1500), attempts: 3 }
+    }
 }
 
 /// Les arguments pour ouvrir une fenêtre de navigateur avec ses onglets. Firefox veut deux
@@ -147,12 +185,14 @@ pub fn tab_commands(kind: Kind, urls: &[String]) -> Vec<Vec<String>> {
 }
 
 /// Exécute le plan de reprise. Rien ne s'arrête sur une erreur : on note et on continue.
-/// « Faire place nette » et la position des fenêtres n'existent que sur Mac pour l'instant.
-pub fn execute(l: &dyn Launcher, actions: &[Action]) -> RestoreReport {
+pub fn execute(l: &dyn Launcher, actions: &[Action], timing: &Timing) -> RestoreReport {
     let mut report = RestoreReport::default();
+    // Fenêtres à replacer une fois tout ouvert : (identité de l'app, cadres).
+    let mut to_place: Vec<(String, Vec<Frame>)> = Vec::new();
     for a in actions {
         match a {
-            Action::HideOthers | Action::PlaceWindows { .. } => {}
+            Action::HideOthers => l.hide_others(),
+            Action::PlaceWindows { bundle_id, frames } => to_place.push((bundle_id.clone(), frames.clone())),
             Action::OpenApp { name, bundle_id } => {
                 let res = match bundle_id.as_deref() {
                     Some(id) => l.launch(id, &[]),
@@ -163,10 +203,20 @@ pub fn execute(l: &dyn Launcher, actions: &[Action]) -> RestoreReport {
                     Err(_) => report.failures.push(format!("Impossible d'ouvrir {name}.")),
                 }
             }
-            Action::OpenFolder { path, .. } => {
+            Action::OpenFolder { path, frame } => {
                 if !Path::new(path).exists() {
                     report.failures.push(format!("Dossier introuvable : {}", sys::file_name(path)));
                     continue;
+                }
+                if let (Some(f), fm) = (frame, l.file_manager_id()) {
+                    if !fm.is_empty() {
+                        // La fenêtre d'un dossier porte son nom : c'est comme ça qu'on la retrouve.
+                        let f = Frame { title: sys::file_name(path), ..f.clone() };
+                        match to_place.iter_mut().find(|(id, _)| id == fm) {
+                            Some((_, v)) => v.push(f),
+                            None => to_place.push((fm.to_string(), vec![f])),
+                        }
+                    }
                 }
                 match l.open(path) {
                     Ok(()) => report.opened += 1,
@@ -212,7 +262,22 @@ pub fn execute(l: &dyn Launcher, actions: &[Action]) -> RestoreReport {
             }
         }
         // Un petit temps entre deux lancements : certaines apps n'aiment pas être pressées.
-        std::thread::sleep(Duration::from_millis(120));
+        if !matches!(a, Action::HideOthers | Action::PlaceWindows { .. }) {
+            std::thread::sleep(Duration::from_millis(120));
+        }
+    }
+
+    // Les apps mettent un peu de temps à ouvrir leurs fenêtres : on attend, puis on réessaie
+    // pour celles qui n'étaient pas encore prêtes.
+    if !to_place.is_empty() {
+        std::thread::sleep(timing.first_wait);
+        for attempt in 0..timing.attempts {
+            to_place.retain(|(id, frames)| l.place(id, frames) < frames.len());
+            if to_place.is_empty() || attempt + 1 == timing.attempts {
+                break;
+            }
+            std::thread::sleep(timing.retry_wait);
+        }
     }
     report
 }
@@ -265,7 +330,7 @@ mod tests {
                 frame: None,
             },
         ];
-        let r = execute(&f, &actions);
+        let r = execute(&f, &actions, &Timing { first_wait: Duration::ZERO, retry_wait: Duration::ZERO, attempts: 1 });
         assert_eq!(r.opened, 4);
         assert_eq!(r.failures.len(), 1);
         let calls = f.calls.borrow();
@@ -281,7 +346,15 @@ mod tests {
             FoundApp { name: "Bloc-notes".into(), id: r"C:\WINDOWS\notepad.exe".into(), frontmost: false, files: vec![] },
             FoundApp { name: "Spotify".into(), id: r"C:\Spotify\Spotify.exe".into(), frontmost: false, files: vec![] },
         ];
-        let s = build_snapshot(&apps, &[r"C:\Users\moi\Documents".into()], &[r"c:\spotify\spotify.exe".into()], vec![]);
+        let frame = Frame { title: "note.txt - Bloc-notes".into(), x: 10, y: 20, w: 800, h: 600 };
+        let s = build_snapshot(
+            &apps,
+            &[(r"c:\windows\NOTEPAD.EXE".into(), frame.clone())],
+            &[FoundFolder { path: r"C:\Users\moi\Documents".into(), frame: None }],
+            &[r"c:\spotify\spotify.exe".into()],
+            vec![],
+        );
+        assert_eq!(s.items[0].frames, vec![frame]);
         let kinds: Vec<_> = s.items.iter().map(|i| (i.kind, i.label.as_str())).collect();
         assert_eq!(kinds, vec![(ItemKind::App, "Bloc-notes"), (ItemKind::Document, "note.txt"), (ItemKind::Folder, "Documents")]);
         assert_eq!(s.front_app.as_deref(), Some("Bloc-notes"));

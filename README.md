@@ -144,7 +144,7 @@ Rien n'est envoyé sur Internet. Aucun compte, aucune pub, aucun traceur. La seu
 - **Sur Mac, Firefox** ne laisse pas les autres apps lire ses onglets : l'app est sauvegardée, mais pas les onglets.
 - Les onglets de **navigation privée** ne sont pas toujours lisibles.
 - Une app qui n'expose pas ses fichiers ouverts à l'accessibilité sera rouverte, mais sans ses fichiers.
-- **Sur Windows et Linux**, les onglets sont lus dans le fichier où chaque navigateur note sa session : il le met à jour toutes les quelques secondes, donc un onglet ouvert à l'instant peut manquer. Les fichiers retrouvés sont ceux que tu as ouverts en double-cliquant dessus, pas ceux ouverts depuis l'app. La place des fenêtres et « Faire place nette » n'existent que sur Mac pour l'instant.
+- **Sur Windows et Linux**, les onglets sont lus dans le fichier où chaque navigateur note sa session : il le met à jour toutes les quelques secondes, donc un onglet ouvert à l'instant peut manquer. Les fichiers retrouvés sont ceux que tu as ouverts en double-cliquant dessus, pas ceux ouverts depuis l'app. Sur Windows, la place des fenêtres de navigateur n'est pas remise ; sur Linux, la place des fenêtres et « Faire place nette » n'existent pas encore.
 - **Sur Linux**, les dossiers ouverts dans le gestionnaire de fichiers ne sont pas encore retrouvés.
 - Reprise rouvre les choses, elle ne peut pas restaurer l'état exact d'une app (position dans une vidéo, texte non enregistré…). C'est le rôle de ta phrase « où j'en étais ».
 
@@ -172,7 +172,7 @@ Pour travailler le design sans lancer l'app : `npm run apercu`, puis ouvre <http
 
 - **Tauri 2 + Rust** pour le cœur : raccourcis globaux, barre des menus, lancement au démarrage, et la capture propre à chaque système :
   - **Mac** : AppleScript (`osascript`) et la commande `open` ;
-  - **Windows** : PowerShell pour la liste des apps et des dossiers de l'Explorateur, et quelques appels directs à Windows pour l'absence ;
+  - **Windows** : PowerShell pour la liste des apps et des dossiers de l'Explorateur, et des appels directs à Windows pour la place des fenêtres, « Faire place nette » et l'absence ;
   - **Linux** : `/proc` et les raccourcis d'apps (`.desktop`), systemd-logind et GNOME pour l'absence ;
   - **Windows et Linux** : les onglets sont lus dans les fichiers de session des navigateurs (Firefox, et le format « SNSS » de Chrome, Edge, Brave, Vivaldi, Opera).
 - **HTML, CSS et JavaScript** sans framework ni étape de compilation pour l'interface (dossier `src/`).
@@ -216,7 +216,7 @@ Chaque Release contient un fichier `latest.json` qui annonce la dernière versio
 ## Idées pour la suite
 
 - Les onglets de Firefox sur Mac, lus dans son fichier de session (comme sur Windows et Linux).
-- La place des fenêtres et « Faire place nette » sur Windows et Linux.
+- La place des fenêtres et « Faire place nette » sur Linux (sous X11).
 - Le Terminal et VS Code rouverts dans le bon dossier.
 - Une mini-liste de prochaines étapes à cocher sur le post-it.
 - Une corbeille : un contexte supprimé reste 30 jours.

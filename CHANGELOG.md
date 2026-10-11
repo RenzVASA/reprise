@@ -1,5 +1,12 @@
 # Nouveautés de Reprise
 
+## 1.4.1
+
+- Windows : les fenêtres reviennent à leur place et à leur taille (apps et dossiers de l'Explorateur), y compris sur un deuxième écran.
+- Windows : « Faire place nette » réduit toutes les autres fenêtres quand tu reprends un contexte.
+- Windows : pas de sauvegarde automatique pendant une vidéo, un film, un stream ou un jeu en plein écran. Reprise croise trois indices : une app qui garde l'écran allumé, le plein écran, et le titre de la fenêtre.
+- Windows : les onglets d'Opera GX (et des autres navigateurs) sont lus même pendant que le navigateur écrit sa session.
+
 ## 1.4.0
 
 - Reprise arrive sur **Windows** (10 et 11) et **Linux**. Elle sauvegarde les apps ouvertes, les onglets de Chrome, Edge, Firefox, Brave, Vivaldi, Opera et Opera GX (fenêtre par fenêtre), les dossiers de l'Explorateur et les fichiers ouverts, puis remet tout en place d'un clic.

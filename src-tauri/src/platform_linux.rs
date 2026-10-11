@@ -329,7 +329,7 @@ pub fn running_apps() -> Result<Vec<RunningApp>, ScriptError> {
 }
 
 pub fn full_capture(_apps: &[RunningApp], _own: &str, ignored: &[String]) -> Snapshot {
-    desktop::build_snapshot(&found_apps(), &[], ignored, Vec::new())
+    desktop::build_snapshot(&found_apps(), &[], &[], ignored, Vec::new())
 }
 
 pub fn capture_all(own: &str, ignored: &[String]) -> Result<Snapshot, ScriptError> {
@@ -370,7 +370,7 @@ impl Launcher for Linux {
 }
 
 pub fn execute(actions: &[Action], _own: &str) -> RestoreReport {
-    desktop::execute(&Linux { entries: desktop_index() }, actions)
+    desktop::execute(&Linux { entries: desktop_index() }, actions, &desktop::Timing::default())
 }
 
 pub fn open_url(url: &str) -> Result<(), String> {
@@ -506,7 +506,7 @@ mod tests {
     fn real_system_does_not_panic() {
         // Sur la machine de test : on doit au moins pouvoir tout parcourir sans planter.
         let apps = found_apps();
-        let _ = desktop::build_snapshot(&apps, &[], &[], Vec::new());
+        let _ = desktop::build_snapshot(&apps, &[], &[], &[], Vec::new());
         let _ = (screen_locked(), idle_seconds(), display_kept_awake());
     }
 }

@@ -3,7 +3,7 @@ import { api, on } from "./api.js";
 import { applyPrefs, initPrefs, effectiveStyle, seasonFor } from "./prefs.js";
 import { esc, icon, repeatSign, ago, when, bucket, domain, hue, initial, prettyShortcut, plural } from "./util.js";
 import { startTour } from "./tour.js";
-import { isMac, T, mod, DEFAULTS, appKey } from "./platform.js";
+import { isMac, OS, T, mod, DEFAULTS, appKey, canTidy } from "./platform.js";
 
 const $ = (s, el = document) => el.querySelector(s);
 /** « ⌥⌘S » → touches ⌥ ⌘ S ; « Ctrl+Alt+S » → Ctrl Alt S. */
@@ -287,12 +287,12 @@ function renderDetail() {
           ${repeatSign()}<span>${state.restoring ? "Reprise en cours…" : "Reprendre"}</span>
         </button>
         <div class="resume-side">
-          ${isMac ? `<label class="switch">
+          ${canTidy ? `<label class="switch">
             <input type="checkbox" id="tidy" ${tidy ? "checked" : ""}>
             <span class="track"></span>
             <span>Faire place nette</span>
           </label>` : ""}
-          <span class="resume-count">${isMac && tidy ? "Les autres apps seront masquées. " : ""}${selectedCount === c.items.length ? `Tout sera rouvert (${plural(c.items.length, "élément", "éléments")}).` : `${selectedCount} élément${selectedCount > 1 ? "s" : ""} sur ${c.items.length} seront rouverts.`}</span>
+          <span class="resume-count">${canTidy && tidy ? (isMac ? "Les autres apps seront masquées. " : "Les autres fenêtres seront réduites. ") : ""}${selectedCount === c.items.length ? `Tout sera rouvert (${plural(c.items.length, "élément", "éléments")}).` : `${selectedCount} élément${selectedCount > 1 ? "s" : ""} sur ${c.items.length} seront rouverts.`}</span>
         </div>
       </div>
 
@@ -701,7 +701,7 @@ function renderSettings() {
 
       <div class="set-group">
         <h3>Comportement</h3>
-        ${isMac ? toggleRow("tidy_by_default", "Faire place nette par défaut", "Masque les autres apps quand tu reprends un contexte.") : ""}
+        ${canTidy ? toggleRow("tidy_by_default", "Faire place nette par défaut", isMac ? "Masque les autres apps quand tu reprends un contexte." : "Réduit les autres fenêtres quand tu reprends un contexte.") : ""}
         ${toggleRow("show_note", "Afficher le post-it « Tu en étais là »", "Un petit rappel de ta note, en haut à droite de l'écran.")}
         ${toggleRow("launch_at_login", "Lancer Reprise à l'ouverture de session", `Discrètement, dans ${T.tray}.`)}
         ${toggleRow("show_in_dock", T.dockIcon, T.dockHint)}
@@ -1038,8 +1038,9 @@ function renderInfo() {
         <li>Les <strong>onglets</strong> de Chrome, Edge, Firefox, Brave, Vivaldi, Opera et Opera GX, fenêtre par fenêtre.</li>
         ${T.foldersCaptured ? `<li>${T.foldersCaptured}</li>` : ""}
         <li>${T.filesCaptured}</li>
+        ${OS === "windows" ? `<li>La <strong>place et la taille</strong> des fenêtres de tes apps et de l'Explorateur, y compris sur un deuxième écran.</li>` : ""}
       </ul>
-      <p class="muted">Ce qui ne l'est pas : ce qu'il y a <em>dans</em> les apps, la place exacte des fenêtres, et les onglets de navigation privée. Un onglet ouvert il y a moins de quelques secondes peut aussi manquer. C'est pour ça que ta phrase compte.</p>`}
+      <p class="muted">Ce qui ne l'est pas : ce qu'il y a <em>dans</em> les apps${OS === "windows" ? ", la place des fenêtres de navigateur" : ", la place exacte des fenêtres"}, et les onglets de navigation privée. Un onglet ouvert il y a moins de quelques secondes peut aussi manquer. C'est pour ça que ta phrase compte.</p>`}
 
       <h3>Comment ça marche, en coulisses</h3>
       ${isMac ? `<p>Pour savoir ce qui est ouvert, Reprise pose la question à macOS en <strong>AppleScript</strong>, le langage intégré au Mac pour piloter les apps. macOS répond avec le nom de chaque app et son identifiant unique (par exemple <code>com.apple.Safari</code>), puis les navigateurs et le Finder donnent leurs onglets et leurs dossiers.</p>
@@ -1211,7 +1212,7 @@ function runTour() {
     { target: "#btn-capture", title: "Sauvegarder", text: `Le geste principal : <strong>${esc(save)}</strong>, depuis n'importe quelle app. Ce bouton fait la même chose.` },
     { target: "#list", title: "Tes contextes", text: `Ils sont rangés par jour, les épinglés en haut. Cherche dans les noms, les notes et les onglets avec <strong>${appKey("F")}</strong>.` },
     { target: ".note-block", title: "Où tu en étais", text: "La phrase que tu écris en sauvegardant, surlignée pour la voir tout de suite. Clique dessus pour la modifier." },
-    { target: ".resume-bar", title: "Reprendre", text: `Un clic rouvre tout${isMac ? ", fenêtres à leur place. « Faire place nette » masque le reste" : ""}. Depuis n'importe où : <strong>${esc(resume)}</strong>.` },
+    { target: ".resume-bar", title: "Reprendre", text: `Un clic rouvre tout${canTidy ? ", fenêtres à leur place. « Faire place nette » " + (isMac ? "masque" : "réduit") + " le reste" : ""}. Depuis n'importe où : <strong>${esc(resume)}</strong>.` },
     { target: ".section", title: "Choisir ce qu'on rouvre", text: "Décoche ce dont tu n'as plus besoin. Survole une ligne pour rouvrir un seul élément." },
     { target: ".safety-folder", title: "Le filet de sécurité", text: `Si tu oublies de sauvegarder, Reprise le fait toute seule quand tu ${T.lockVerb} ou que tu t'absentes. Elle garde les 3 dernières dans ce dossier, et l'interrupteur la coupe.` },
     { target: ".top-actions", title: "Aide et réglages", text: `Le <strong>i</strong> explique tout, la roue règle les polices, les habillages, les raccourcis et le filet. Reprise vit aussi dans ${T.tray}.` },
