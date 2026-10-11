@@ -60,6 +60,7 @@ Reprise est utile à tout le monde, mais il a été pensé d'abord pour les pers
 | Filet de sécurité | Sauvegarde automatique au verrouillage, à la mise en veille ou après 5 minutes d'inactivité, sauf pendant une vidéo ou un stream. Les 3 dernières sont rangées dans un dossier qui s'active ou se désactive d'un clic. Post-it « Tu étais sur… » au retour |
 | Choix | Décocher des éléments au moment de sauvegarder, liste d'apps à ne jamais enregistrer |
 | Barre des menus | Sauvegarde et reprise des contextes récents sans ouvrir la fenêtre |
+| Habillages | Classique, Forêt, Océan, en clair ou en sombre. Halloween (15 octobre → 2 novembre) et Noël (1er décembre → 6 janvier) arrivent et repartent tout seuls. L'icône du Dock et le post-it suivent l'habillage |
 | Mises à jour | Reprise prévient quand une nouvelle version sort, la télécharge, vérifie sa signature, l'installe et redémarre, en un clic |
 | Aide | Visite guidée au premier lancement, astuce à la première sauvegarde, et le bouton « i » qui explique tout |
 | Organisation | Recherche dans les noms, les notes et les onglets, épinglage, renommage, mise à jour d'un contexte avec ce qui est ouvert maintenant, suppression avec « Annuler » |
@@ -83,7 +84,7 @@ Reprise est utile à tout le monde, mais il a été pensé d'abord pour les pers
 Chaque version publie l'**empreinte SHA-256** de son `.dmg` (dans le texte de la Release et dans un fichier `.sha256` à côté). C'est une sorte d'empreinte digitale : si le fichier a été modifié, même d'un seul octet, l'empreinte change complètement.
 
 ```bash
-shasum -a 256 ~/Downloads/Reprise_1.0.0_aarch64.dmg
+shasum -a 256 ~/Downloads/Reprise_*_aarch64.dmg
 ```
 
 Compare le résultat avec l'empreinte affichée sur la page de la Release : les deux doivent être identiques.
@@ -91,8 +92,12 @@ Compare le résultat avec l'empreinte affichée sur la page de la Release : les 
 Le `.dmg` est fabriqué directement par GitHub Actions à partir du code public de ce dépôt, et GitHub signe sa provenance. Pour le vérifier (avec l'outil [GitHub CLI](https://cli.github.com)) :
 
 ```bash
-gh attestation verify ~/Downloads/Reprise_1.0.0_aarch64.dmg -R RenzVASA/reprise
+gh attestation verify ~/Downloads/Reprise_*_aarch64.dmg -R RenzVASA/reprise
 ```
+
+### Signée RenzVASA
+
+Depuis la version 1.1.2, l'app est signée avec le certificat RenzVASA. Ce n'est pas un certificat payant d'Apple (d'où la commande `xattr` ci-dessus), mais il permet à macOS de reconnaître Reprise d'une version à l'autre : tes autorisations (Automatisation, Accessibilité) restent en place après chaque mise à jour.
 
 ### Les autorisations demandées
 
@@ -144,6 +149,8 @@ Pour travailler le design sans lancer l'app : `npm run apercu`, puis ouvre <http
 
 ```
 src/                 interface : fenêtre principale, fenêtre de sauvegarde, post-it
+  css/themes.css     les habillages (Forêt, Océan, Halloween, Noël)
+design/styles/       les icônes du Dock de chaque habillage (SVG)
 src-tauri/src/
   lib.rs             démarrage, fenêtres, barre des menus, raccourcis, commandes
   capture.rs         la photo du contexte
@@ -177,6 +184,7 @@ Chaque Release contient un fichier `latest.json` qui annonce la dernière versio
 - Une mini-liste de prochaines étapes à cocher sur le post-it.
 - Une corbeille : un contexte supprimé reste 30 jours.
 - Export et import des contextes.
+- D'autres habillages de saison (printemps, rentrée…).
 
 ## Crédits
 
