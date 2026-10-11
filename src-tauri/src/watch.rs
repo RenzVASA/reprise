@@ -103,6 +103,34 @@ pub fn idle_seconds() -> Option<u64> {
     ioreg(&["-c", "IOHIDSystem", "-d", "4"]).and_then(|o| parse_idle(&o))
 }
 
+/// Une app empêche l'écran de s'éteindre : une vidéo YouTube, un stream, un film, une visio…
+/// Dans ce cas tu regardes, tu n'es pas parti : l'inactivité du clavier ne compte pas.
+/// (`None` si on ne sait pas le lire.)
+pub fn display_kept_awake() -> Option<bool> {
+    let out = Command::new("/usr/bin/pmset").args(["-g", "assertions"]).output().ok()?;
+    out.status
+        .success()
+        .then(|| parse_display_awake(&String::from_utf8_lossy(&out.stdout)))
+}
+
+/// Lit la ligne « PreventUserIdleDisplaySleep  1 » du résumé de `pmset -g assertions`.
+pub fn parse_display_awake(text: &str) -> bool {
+    text.lines().any(|l| {
+        let mut parts = l.split_whitespace();
+        parts.next() == Some("PreventUserIdleDisplaySleep")
+            && parts.next().and_then(|n| n.parse::<u32>().ok()).is_some_and(|n| n > 0)
+    })
+}
+
+/// L'inactivité à prendre en compte : nulle si une vidéo ou un stream garde l'écran allumé.
+pub fn effective_idle(idle_secs: Option<u64>, display_awake: Option<bool>) -> Option<u64> {
+    if display_awake == Some(true) {
+        Some(0)
+    } else {
+        idle_secs
+    }
+}
+
 pub fn parse_locked(plist: &str) -> bool {
     let key = "<key>CGSSessionScreenIsLocked</key>";
     match plist.find(key) {
@@ -124,6 +152,24 @@ mod tests {
 
     const CFG: Config = Config { idle_snapshot_secs: 300, welcome_after_ms: 20 * 60_000 };
     const MIN: u64 = 60_000;
+
+    #[test]
+    fn watching_a_video_is_not_being_away() {
+        let pmset = "Assertion status system-wide:\n   BackgroundTask                 0\n   PreventUserIdleDisplaySleep    1\n   PreventSystemSleep             0\nListed by owning process:\n   pid 512(Opera GX Helper): [0x00001a] 01:02:03 PreventUserIdleDisplaySleep named: \"Video Wake Lock\"\n";
+        assert!(parse_display_awake(pmset));
+        assert!(!parse_display_awake("Assertion status system-wide:\n   PreventUserIdleDisplaySleep    0\n   PreventUserIdleSystemSleep     1\n"));
+        assert!(!parse_display_awake(""));
+        assert_eq!(effective_idle(Some(3600), Some(true)), Some(0));
+        assert_eq!(effective_idle(Some(3600), Some(false)), Some(3600));
+        assert_eq!(effective_idle(Some(3600), None), Some(3600));
+        // Une heure de vidéo sans toucher au clavier : aucune sauvegarde.
+        let mut w = Watch::default();
+        let mut t = 1_000_000_000;
+        for i in 0..240 {
+            assert!(w.tick(t, Some(false), effective_idle(Some(i * 15), Some(true)), &CFG).is_empty());
+            t += 15_000;
+        }
+    }
 
     #[test]
     fn lock_then_unlock_after_a_while() {

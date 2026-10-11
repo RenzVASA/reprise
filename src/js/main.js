@@ -17,7 +17,16 @@ const state = {
   editingNote: false,
   restoring: false,
   settings: null,
+  /** Le dossier « Filet de sécurité » est-il déplié ? (gardé d'une ouverture à l'autre) */
+  safetyOpen: readSafetyOpen(),
 };
+
+function readSafetyOpen() {
+  try { return localStorage.getItem("reprise.safetyOpen") === "1"; } catch { return false; }
+}
+function writeSafetyOpen(v) {
+  try { localStorage.setItem("reprise.safetyOpen", v ? "1" : "0"); } catch { /* sans importance */ }
+}
 
 const listEl = $("#list");
 const detailEl = $("#detail");
@@ -47,8 +56,9 @@ function visible() {
   const q = state.query.trim().toLowerCase();
   const words = q.split(/\s+/).filter(Boolean);
   return state.contexts
+    .filter((c) => words.length || !c.auto || state.safetyOpen)
     .filter((c) => !words.length || words.every((w) => haystack(c).includes(w)))
-    .sort((a, b) => (a.auto - b.auto) || (b.pinned - a.pinned) || (a.auto ? b.updated_at - a.updated_at : b.created_at - a.created_at));
+    .sort((a, b) => (b.auto - a.auto) || (b.pinned - a.pinned) || (a.auto ? b.updated_at - a.updated_at : b.created_at - a.created_at));
 }
 
 const current = () => state.contexts.find((c) => c.id === state.selected) || null;
@@ -92,18 +102,47 @@ function rowHtml(c) {
     </button>`;
 }
 
+function safetyFolder(autos) {
+  const enabled = !!state.settings?.auto_save;
+  const open = state.safetyOpen;
+  const n = state.contexts.filter((c) => c.auto).length;
+  let body = "";
+  if (open) {
+    if (autos.length) body = autos.map(rowHtml).join("");
+    else body = `<p class="safety-empty">${enabled
+      ? "Rien pour l'instant. Reprise sauvegarde toute seule quand tu verrouilles ton Mac, qu'il se met en veille ou que tu t'absentes (sauf pendant une vidéo)."
+      : "Désactivé : Reprise ne sauvegarde plus toute seule. Rallume l'interrupteur pour le réactiver."}</p>`;
+  }
+  return `
+    <section class="safety-folder ${open ? "open" : ""} ${enabled ? "" : "off"}">
+      <div class="safety-head">
+        <button class="safety-open" data-safety="open" aria-expanded="${open}" title="Les sauvegardes que Reprise fait toute seule. Elle garde les 3 dernières.">
+          ${icon("chevron")}${icon("shield")}<span>Filet de sécurité</span>
+          <span class="safety-count">${enabled ? (n || "") : "désactivé"}</span>
+        </button>
+        <label class="switch small" title="${enabled ? "Désactiver" : "Activer"} les sauvegardes automatiques">
+          <input type="checkbox" data-safety="enabled" ${enabled ? "checked" : ""} aria-label="Sauvegardes automatiques"><span class="track"></span>
+        </label>
+      </div>
+      ${open ? `<div class="safety-body">${body}</div>` : ""}
+    </section>`;
+}
+
 function renderList() {
   const vis = visible();
-  if (!state.contexts.length) {
-    listEl.innerHTML = `<p class="list-empty">Tes contextes sauvegardés apparaîtront ici.</p>`;
+  const searching = !!state.query.trim();
+  const folder = searching ? "" : safetyFolder(vis.filter((c) => c.auto));
+  const own = state.contexts.filter((c) => !c.auto);
+  if (!own.length && !searching) {
+    listEl.innerHTML = folder + `<p class="list-empty">Tes contextes sauvegardés apparaîtront ici.</p>`;
     return;
   }
   if (!vis.length) {
     listEl.innerHTML = `<p class="list-empty">Rien ne correspond à « ${esc(state.query)} ».</p>`;
     return;
   }
-  let html = "";
-  if (state.query.trim()) {
+  let html = folder;
+  if (searching) {
     html += `<h2 class="group-title">${plural(vis.length, "résultat", "résultats")}</h2>` + vis.map(rowHtml).join("");
   } else {
     const pinned = vis.filter((c) => c.pinned && !c.auto);
@@ -113,10 +152,6 @@ function renderList() {
       const b = bucket(c.created_at);
       if (b !== last) { html += `<h2 class="group-title">${b}</h2>`; last = b; }
       html += rowHtml(c);
-    }
-    const autos = vis.filter((c) => c.auto);
-    if (autos.length) {
-      html += `<h2 class="group-title safety" title="Reprise sauvegarde toute seule quand tu t'absentes. Elle garde les 3 dernières.">${icon("shield")}Filet de sécurité</h2>` + autos.map(rowHtml).join("");
     }
   }
   listEl.innerHTML = html;
@@ -415,8 +450,23 @@ function toast(msg, { action, onAction, timeout = 5000 } = {}) {
 // ───────────────────────────── Événements ──────────────────────────
 
 listEl.addEventListener("click", (e) => {
+  if (e.target.closest('[data-safety="open"]')) {
+    state.safetyOpen = !state.safetyOpen;
+    writeSafetyOpen(state.safetyOpen);
+    const cur = current();
+    if (!state.safetyOpen && cur?.auto) state.selected = visible()[0]?.id ?? null;
+    render();
+    return;
+  }
   const row = e.target.closest(".row");
   if (row) select(row.dataset.id);
+});
+
+listEl.addEventListener("change", async (e) => {
+  if (e.target.dataset.safety !== "enabled" || !state.settings) return;
+  await saveSettings({ auto_save: e.target.checked });
+  renderList();
+  toast(e.target.checked ? "Sauvegardes automatiques activées." : "Sauvegardes automatiques désactivées.", { timeout: 2500 });
 });
 
 detailEl.addEventListener("click", (e) => {
@@ -512,7 +562,7 @@ $("#btn-info").addEventListener("click", () => openInfo());
 on("contexts-changed", () => load());
 on("context-saved", (id) => { state.selected = id; state.query = ""; searchEl.value = ""; load(); });
 on("toast", (msg) => toast(String(msg)));
-on("settings-changed", (s) => { state.settings = s; updateShortcutHints(); renderDetail(); });
+on("settings-changed", (s) => { state.settings = s; updateShortcutHints(); render(); });
 window.addEventListener("focus", () => load());
 
 function updateShortcutHints() {
@@ -618,7 +668,7 @@ function renderSettings() {
 
       <div class="set-group">
         <h3>Filet de sécurité</h3>
-        ${toggleRow("auto_save", "Sauvegarder tout seul quand je m'absente", "Quand tu verrouilles ton Mac, qu'il se met en veille, ou après 5 minutes sans toucher au clavier. Reprise garde les 3 dernières.")}
+        ${toggleRow("auto_save", "Sauvegarder tout seul quand je m'absente", "Quand tu verrouilles ton Mac, qu'il se met en veille, ou après 5 minutes sans toucher au clavier (sauf si une vidéo ou un stream tourne). Reprise garde les 3 dernières, rangées dans le dossier « Filet de sécurité ».")}
         ${toggleRow("welcome_back", "Me proposer de reprendre en revenant", "Un post-it « Tu étais sur… » après une absence.")}
         <div class="set-row ${s.welcome_back ? "" : "dim"}">
           <div class="label"><span>Après une absence de</span></div>

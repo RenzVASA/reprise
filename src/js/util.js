@@ -22,6 +22,7 @@ const P = {
   download: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/>',
   shield: '<path d="M12 3.5l7 2.8v5.4c0 4.2-2.9 7.6-7 8.8-4.1-1.2-7-4.6-7-8.8V6.3z"/><path d="M9 12l2.2 2.2L15.5 10"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  chevron: '<path d="M9.5 6l6 6-6 6"/>',
   plusCircle: '<circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/>',
 };
 

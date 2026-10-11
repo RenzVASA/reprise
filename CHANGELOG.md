@@ -1,5 +1,10 @@
 # Nouveautés de Reprise
 
+## 1.2.0
+
+- Les sauvegardes automatiques sont rangées dans un dossier « Filet de sécurité », en haut de la liste. Il se plie et se déplie d'un clic, et un interrupteur l'active ou le désactive directement.
+- Plus de sauvegarde automatique pendant une vidéo YouTube, un film ou un stream : tant qu'une app garde l'écran allumé, Reprise sait que tu es là.
+
 ## 1.1.2
 
 - Reprise est maintenant signée avec le certificat RenzVASA : macOS la reconnaît d’une version à l’autre et garde tes autorisations (onglets, dossiers, fichiers ouverts) après les mises à jour. Après celle-ci, il te les redemandera une dernière fois.

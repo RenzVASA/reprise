@@ -473,7 +473,9 @@ fn start_watcher(app: AppHandle) {
                 (s.auto_save, s.welcome_back, s.welcome_minutes, s.onboarded)
             };
             let cfg = watch::Config { idle_snapshot_secs: 300, welcome_after_ms: minutes as u64 * 60_000 };
-            let events = w.tick(now_ms(), watch::screen_locked(), watch::idle_seconds(), &cfg);
+            // Une vidéo ou un stream garde l'écran allumé : tu regardes, tu n'es pas parti.
+            let idle = watch::effective_idle(watch::idle_seconds(), watch::display_kept_awake());
+            let events = w.tick(now_ms(), watch::screen_locked(), idle, &cfg);
             if !onboarded {
                 continue;
             }

@@ -312,8 +312,28 @@ code { font: .88em ui-monospace, "SF Mono", Menlo, monospace; background: var(--
 .dev-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .3rem; }
 
 /* ── Filet de sécurité ───────────────────────────────────── */
-.group-title.safety { display: flex; align-items: center; gap: .4rem; margin-top: 1.6rem; padding-top: 1rem; border-top: 1px dashed var(--line); }
-.group-title.safety .icon { width: 1em; height: 1em; }
+.safety-folder {
+  margin: .1rem .1rem .9rem;
+  border: 1px dashed var(--line); border-radius: var(--r-l);
+  background: var(--paper);
+}
+.safety-head { display: flex; align-items: center; gap: .4rem; padding: .25rem .55rem .25rem .25rem; }
+.safety-open {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: .45rem;
+  background: none; border: 0; border-radius: var(--r-m); padding: .45rem .5rem;
+  font-family: var(--font-display); font-size: .86rem; font-weight: 700; color: var(--ink-2); text-align: left;
+}
+.safety-open:hover { background: var(--surface-2); color: var(--ink); }
+.safety-open .icon { width: 1em; height: 1em; flex: none; }
+.safety-open .icon:first-child { transition: transform .15s; color: var(--ink-3); }
+.safety-folder.open .safety-open .icon:first-child { transform: rotate(90deg); }
+.safety-count { margin-left: auto; font-family: var(--font-body, inherit); font-size: .78rem; font-weight: 600; color: var(--ink-3); }
+.safety-folder.off .safety-open { color: var(--ink-3); }
+.safety-folder.off .safety-count { font-style: italic; }
+.safety-body { padding: 0 .35rem .4rem; }
+.safety-empty { margin: 0 .6rem .5rem; font-size: .82rem; line-height: 1.45; color: var(--ink-3); }
+.switch.small { font-size: .82rem; }
+@media (prefers-reduced-motion: reduce) { .safety-open .icon:first-child { transition: none; } }
 .row.auto .row-name { display: flex; align-items: center; gap: .45rem; font-size: .92rem; font-weight: 600; color: var(--ink-2); }
 .row.auto .row-name .icon { width: 1em; height: 1em; color: var(--ink-3); }
 .row.auto.selected .row-name { color: var(--ink); }
