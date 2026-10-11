@@ -1,6 +1,7 @@
 // Fenêtre de sauvegarde rapide.
 import { api, on } from "./api.js";
 import { initPrefs } from "./prefs.js";
+import { mod } from "./platform.js";
 import { esc, icon, repeatSign, plural, suggestName, domain } from "./util.js";
 
 const $ = (s) => document.querySelector(s);
@@ -164,7 +165,7 @@ nameEl.addEventListener("input", () => (nameTouched = true));
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { e.preventDefault(); cancel(); return; }
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
-    if (e.target === noteEl || e.target === nameEl || e.metaKey) { e.preventDefault(); save(); }
+    if (e.target === noteEl || e.target === nameEl || mod(e)) { e.preventDefault(); save(); }
   }
 });
 

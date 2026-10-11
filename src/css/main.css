@@ -15,6 +15,9 @@ body { display: flex; flex-direction: column; }
   background: var(--paper);
 }
 .brand { display: flex; align-items: center; gap: .55rem; width: calc(340px - 84px - 1rem); flex: none; }
+/* Windows et Linux : pas de boutons de fenêtre façon Mac dans la barre, elle commence au bord. */
+.os-windows .topbar, .os-linux .topbar { padding-left: 1rem; }
+.os-windows .brand, .os-linux .brand { width: calc(340px - 2rem); }
 .brand-mark { width: .9rem; height: 1.2rem; color: var(--ink); }
 .brand-mark .dot { fill: var(--dot); }
 .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; letter-spacing: -.01em; }

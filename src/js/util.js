@@ -1,4 +1,5 @@
 // Petits outils partagés par les fenêtres.
+import { isMac } from "./platform.js";
 
 export const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -92,8 +93,13 @@ export function initial(text) {
   return (t.match(/[\p{L}\p{N}]/u) || ["?"])[0].toUpperCase();
 }
 
-/** "Alt+Command+S" → "⌥⌘S" */
+/** "Alt+Command+S" → "⌥⌘S" sur Mac ; "Ctrl+Alt+S" → "Ctrl+Alt+S" ailleurs. */
 export function prettyShortcut(s) {
+  if (!isMac) {
+    const names = { control: "Ctrl", ctrl: "Ctrl", commandorcontrol: "Ctrl", cmdorctrl: "Ctrl", alt: "Alt", option: "Alt", shift: "Maj", command: "Win", cmd: "Win", super: "Win", meta: "Win" };
+    const parts = String(s || "").split("+").map((p) => p.trim()).filter(Boolean);
+    return parts.map((p) => names[p.toLowerCase()] || p.replace(/^key/i, "").replace(/^digit/i, "").toUpperCase()).join("+");
+  }
   const mods = new Set();
   let key = "";
   for (const part of String(s || "").split("+")) {

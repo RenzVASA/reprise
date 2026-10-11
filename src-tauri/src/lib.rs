@@ -1,16 +1,31 @@
 //! Reprise — sauvegarde ton contexte de travail en un raccourci, reprends-le en un clic.
 
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod capture;
+#[cfg_attr(target_os = "macos", allow(dead_code))]
+mod desktop;
 mod model;
+mod platform;
+#[cfg(target_os = "linux")]
+mod platform_linux;
+#[cfg(target_os = "windows")]
+mod platform_windows;
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod restore;
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod script;
+#[cfg_attr(target_os = "macos", allow(dead_code))]
+mod sessions;
 mod settings;
 mod store;
+#[cfg_attr(target_os = "macos", allow(dead_code))]
+mod sys;
 mod update;
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod watch;
 
 use model::{now_ms, new_id, Context, ContextPatch, PendingCapture, RestoreReport, Screen, Snapshot};
-use script::{Osascript, Runner, ScriptError};
+use script::ScriptError;
 use serde::Serialize;
 use settings::{IgnoredApp, Settings};
 use std::collections::HashSet;
@@ -71,8 +86,14 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+/// Ce qui identifie Reprise elle-même, pour ne pas s'enregistrer dans ses propres contextes :
+/// son identifiant de bundle sur Mac, le chemin de son programme ailleurs.
 fn own_bundle(app: &AppHandle) -> String {
-    app.config().identifier.clone()
+    if cfg!(target_os = "macos") {
+        app.config().identifier.clone()
+    } else {
+        std::env::current_exe().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default()
+    }
 }
 
 // ───────────────────────────────── Fenêtres ─────────────────────────────────
@@ -110,6 +131,16 @@ fn notify_changed(app: &AppHandle) {
 
 // ───────────────────────────────── Capture ──────────────────────────────────
 
+#[cfg(not(target_os = "macos"))]
+fn script_error_text(e: &ScriptError) -> String {
+    match e {
+        ScriptError::Timeout => "Le système a mis trop de temps à répondre. Réessaie dans un instant.".into(),
+        ScriptError::Other(m) => format!("La capture a échoué : {m}"),
+        _ => "La capture a échoué.".into(),
+    }
+}
+
+#[cfg(target_os = "macos")]
 fn script_error_text(e: &ScriptError) -> String {
     match e {
         ScriptError::NotAuthorized => "Reprise n'a pas le droit de lister tes apps. Autorise « System Events » dans Réglages Système › Confidentialité et sécurité › Automatisation.".into(),
@@ -127,16 +158,15 @@ fn begin_capture(app: AppHandle, replace_id: Option<String>, from_app: bool) {
         let state = app.state::<AppState>();
         let own = own_bundle(&app);
         let ignored = lock(&state.settings).ignored_ids();
-        let runner = Osascript::default();
 
-        let (apps, first_error) = match capture::running_apps(&runner) {
+        let (apps, first_error) = match platform::running_apps() {
             Ok(a) => (a, None),
             Err(e) => (Vec::new(), Some(e)),
         };
         let started_at = now_ms();
         *lock(&state.pending) = Some(PendingCapture {
             snapshot: None,
-            front_app: capture::frontmost(&apps, &own),
+            front_app: apps.iter().find(|a| a.frontmost && a.bundle_id.as_deref() != Some(own.as_str())).map(|a| a.name.clone()),
             started_at,
             replace_id,
         });
@@ -145,12 +175,16 @@ fn begin_capture(app: AppHandle, replace_id: Option<String>, from_app: bool) {
         let _ = app.emit_to("capture", "capture-start", ());
         show_window(&app, "capture");
 
-        let mut snap: Snapshot = capture::full_capture(&runner, &apps, &own, &ignored);
+        let mut snap: Snapshot = platform::full_capture(&apps, &own, &ignored);
         if let Some(e) = first_error {
             snap.warnings.insert(0, script_error_text(&e));
         }
         if let Some(p) = lock(&state.pending).as_mut() {
             if p.started_at == started_at {
+                // Sous Windows et Linux, l'app au premier plan n'est connue qu'ici.
+                if p.front_app.is_none() {
+                    p.front_app = snap.front_app.clone();
+                }
                 p.snapshot = Some(snap);
             }
         }
@@ -169,7 +203,7 @@ fn restore_internal(app: &AppHandle, id: &str, items: Option<Vec<String>>, tidy:
     };
     let selected: Option<HashSet<String>> = items.map(|v| v.into_iter().collect());
     let actions = restore::plan(&ctx, selected.as_ref(), tidy.unwrap_or(tidy_default), &screens(app));
-    let report = restore::execute(&Osascript::default(), &actions, &own_bundle(app), &restore::Timing::default());
+    let report = platform::execute(&actions, &own_bundle(app));
 
     lock(&state.store).mark_restored(id)?;
     notify_changed(app);
@@ -300,7 +334,23 @@ fn refresh_tray(app: &AppHandle) {
     }
 }
 
+/// "Ctrl+Alt+S" → "Ctrl+Alt+S" (Windows et Linux : on garde les mots).
+#[cfg(not(target_os = "macos"))]
+fn pretty_shortcut(s: &str) -> String {
+    s.split('+')
+        .map(|p| match p.trim().to_ascii_lowercase().as_str() {
+            "control" | "ctrl" | "commandorcontrol" | "cmdorctrl" => "Ctrl".to_string(),
+            "alt" | "option" => "Alt".to_string(),
+            "shift" => "Maj".to_string(),
+            "command" | "cmd" | "super" | "meta" => "Win".to_string(),
+            other => other.trim_start_matches("key").trim_start_matches("digit").to_uppercase(),
+        })
+        .collect::<Vec<_>>()
+        .join("+")
+}
+
 /// "Alt+Command+S" → "⌥⌘S".
+#[cfg(target_os = "macos")]
 fn pretty_shortcut(s: &str) -> String {
     let mut mods = String::new();
     let mut key = String::new();
@@ -324,10 +374,16 @@ fn pretty_shortcut(s: &str) -> String {
 
 fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let menu = build_tray_menu(app)?;
-    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?;
+    // Sur Mac, une icône noire que macOS colore selon le thème. Ailleurs, l'icône en couleur
+    // (une icône noire serait invisible sur une barre des tâches sombre).
+    let icon = if cfg!(target_os = "macos") {
+        tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?
+    } else {
+        tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))?
+    };
     TrayIconBuilder::<tauri::Wry>::with_id(TRAY_ID)
         .icon(icon)
-        .icon_as_template(true)
+        .icon_as_template(cfg!(target_os = "macos"))
         .tooltip("Reprise")
         .menu(&menu)
         .show_menu_on_left_click(true)
@@ -435,7 +491,7 @@ fn auto_snapshot(app: &AppHandle) {
         *running = true;
     }
     let ignored = lock(&state.settings).ignored_ids();
-    let result = capture::capture_all(&Osascript::default(), &own_bundle(app), &ignored);
+    let result = platform::capture_all(&own_bundle(app), &ignored);
     if let Ok(snap) = result {
         if matches!(lock(&state.store).add_auto(snap, 3), Ok(true)) {
             notify_changed(app);
@@ -474,8 +530,8 @@ fn start_watcher(app: AppHandle) {
             };
             let cfg = watch::Config { idle_snapshot_secs: 300, welcome_after_ms: minutes as u64 * 60_000 };
             // Une vidéo ou un stream garde l'écran allumé : tu regardes, tu n'es pas parti.
-            let idle = watch::effective_idle(watch::idle_seconds(), watch::display_kept_awake());
-            let events = w.tick(now_ms(), watch::screen_locked(), idle, &cfg);
+            let idle = watch::effective_idle(platform::idle_seconds(), platform::display_kept_awake());
+            let events = w.tick(now_ms(), platform::screen_locked(), idle, &cfg);
             if !onboarded {
                 continue;
             }
@@ -517,7 +573,7 @@ fn style_icon(style: &str) -> Option<&'static [u8]> {
 /// Change l'icône de l'app dans le Dock tant qu'elle tourne (macOS remet l'icône
 /// d'origine quand l'app est fermée). Doit être appelé sur le fil principal.
 #[cfg(target_os = "macos")]
-fn set_dock_icon(png: Option<&'static [u8]>) {
+fn set_dock_icon(_app: &AppHandle, png: Option<&'static [u8]>) {
     use objc2::{AnyThread, MainThreadMarker};
     use objc2_app_kit::{NSApplication, NSImage};
     use objc2_foundation::NSData;
@@ -528,16 +584,29 @@ fn set_dock_icon(png: Option<&'static [u8]>) {
     unsafe { app.setApplicationIconImage(image.as_deref()) };
 }
 
+/// Windows et Linux : l'icône de la fenêtre (et donc de la barre des tâches) suit l'habillage.
 #[cfg(not(target_os = "macos"))]
-fn set_dock_icon(_png: Option<&'static [u8]>) {}
+fn set_dock_icon(app: &AppHandle, png: Option<&'static [u8]>) {
+    let bytes = png.unwrap_or(&include_bytes!("../icons/128x128@2x.png")[..]);
+    if let (Some(w), Ok(img)) = (app.get_webview_window("main"), tauri::image::Image::from_bytes(bytes)) {
+        let _ = w.set_icon(img);
+    }
+}
 
 fn apply_style_icon(app: &AppHandle) {
     let png = style_icon(&lock(&DOCK_STYLE));
-    let _ = app.run_on_main_thread(move || set_dock_icon(png));
+    let h = app.clone();
+    let _ = app.run_on_main_thread(move || set_dock_icon(&h, png));
 }
 
+/// Windows et Linux : « Icône dans la barre des tâches ».
 #[cfg(not(target_os = "macos"))]
-fn apply_dock(_app: &AppHandle, _show: bool) {}
+fn apply_dock(app: &AppHandle, show: bool) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.set_skip_taskbar(!show);
+    }
+    apply_style_icon(app);
+}
 
 /// La fenêtre principale indique l'habillage affiché ; l'icône du Dock suit.
 #[tauri::command]
@@ -915,23 +984,13 @@ struct Permissions {
     accessibility: &'static str,
 }
 
-fn perm_status(r: Result<String, ScriptError>) -> &'static str {
-    match r {
-        Ok(_) => "ok",
-        Err(ScriptError::NotAuthorized) | Err(ScriptError::Accessibility) => "denied",
-        Err(_) => "unknown",
-    }
-}
-
 /// Vérifie les autorisations (et déclenche les demandes de macOS la première fois).
+/// Ailleurs, il n'y en a pas : « na ».
 #[tauri::command]
 async fn check_permissions() -> Permissions {
     tauri::async_runtime::spawn_blocking(|| {
-        let r = Osascript::default();
-        Permissions {
-            automation: perm_status(r.run(script::PERM_AUTOMATION, &[])),
-            accessibility: perm_status(r.run(script::PERM_ACCESSIBILITY, &[])),
-        }
+        let (automation, accessibility) = platform::permissions();
+        Permissions { automation, accessibility }
     })
     .await
     .unwrap_or(Permissions { automation: "unknown", accessibility: "unknown" })
@@ -939,21 +998,17 @@ async fn check_permissions() -> Permissions {
 
 #[tauri::command]
 fn open_privacy_pane(kind: String) -> Result<(), String> {
-    let anchor = match kind.as_str() {
-        "accessibility" => "Privacy_Accessibility",
-        _ => "Privacy_Automation",
-    };
-    script::open(&[&format!("x-apple.systempreferences:com.apple.preference.security?{anchor}")])
+    platform::open_privacy(&kind)
 }
 
 #[tauri::command]
 fn reveal_data(app: AppHandle) -> Result<(), String> {
     let path = lock(&app.state::<AppState>().store).path().to_path_buf();
     if path.exists() {
-        script::open(&["-R", &path.to_string_lossy()])
+        platform::reveal(&path)
     } else if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-        script::open(&[&dir.to_string_lossy()])
+        platform::open_dir(dir)
     } else {
         Err("Dossier de données introuvable.".into())
     }
@@ -964,7 +1019,7 @@ fn open_link(url: String) -> Result<(), String> {
     if !url.starts_with("https://") {
         return Err("Lien refusé.".into());
     }
-    script::open(&[&url])
+    platform::open_url(&url)
 }
 
 /// Ouvre un seul élément d'un contexte (clic sur une ligne dans le détail).
@@ -976,7 +1031,7 @@ async fn open_item(app: AppHandle, id: String, item: String) -> Result<RestoreRe
         let ctx = lock(&state.store).get(&id).cloned().ok_or("Ce contexte n'existe plus.")?;
         let sel: HashSet<String> = [item].into_iter().collect();
         let actions = restore::plan(&ctx, Some(&sel), false, &screens(&handle));
-        Ok(restore::execute(&Osascript::default(), &actions, &own_bundle(&handle), &restore::Timing::default()))
+        Ok(platform::execute(&actions, &own_bundle(&handle)))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -986,6 +1041,8 @@ async fn open_item(app: AppHandle, id: String, item: String) -> Result<RestoreRe
 struct AppInfo {
     version: String,
     data_path: String,
+    /// "macos", "windows" ou "linux" : l'interface adapte ses mots et ses raccourcis.
+    os: &'static str,
 }
 
 #[tauri::command]
@@ -993,6 +1050,7 @@ fn app_info(app: AppHandle) -> AppInfo {
     AppInfo {
         version: app.package_info().version.to_string(),
         data_path: lock(&app.state::<AppState>().store).path().to_string_lossy().into_owned(),
+        os: platform::OS,
     }
 }
 
@@ -1038,6 +1096,13 @@ pub fn run() {
                 installing: Mutex::new(false),
                 auto_running: Mutex::new(false),
             });
+
+            // Les fenêtres sont créées ici, après `manage` : sous Windows, la page se charge
+            // pendant la création de la fenêtre et appelle tout de suite le cœur Rust, qui doit
+            // donc déjà avoir son état (sinon Reprise plante au démarrage).
+            for cfg in app.config().app.windows.clone() {
+                tauri::WebviewWindowBuilder::from_config(&handle, &cfg)?.build()?;
+            }
 
             if let Err(e) = apply_shortcuts_from(&handle, &settings) {
                 // Raccourci personnalisé indisponible : on retombe sur ceux par défaut.

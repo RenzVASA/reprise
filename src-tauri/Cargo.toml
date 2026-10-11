@@ -1,7 +1,7 @@
 [package]
 name = "reprise"
-version = "1.3.0"
-description = "Sauvegarde ton contexte de travail en un raccourci, reprends-le en un clic."
+version = "1.4.0"
+description = "Sauvegarde ton contexte de travail en un raccourci, reprends-le en un clic. Mac, Windows et Linux."
 authors = ["RenzVASA"]
 license = "MIT"
 repository = "https://github.com/RenzVASA/reprise"

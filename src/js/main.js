@@ -3,8 +3,11 @@ import { api, on } from "./api.js";
 import { applyPrefs, initPrefs, effectiveStyle, seasonFor } from "./prefs.js";
 import { esc, icon, repeatSign, ago, when, bucket, domain, hue, initial, prettyShortcut, plural } from "./util.js";
 import { startTour } from "./tour.js";
+import { isMac, T, mod, DEFAULTS, appKey } from "./platform.js";
 
 const $ = (s, el = document) => el.querySelector(s);
+/** « ⌥⌘S » → touches ⌥ ⌘ S ; « Ctrl+Alt+S » → Ctrl Alt S. */
+const keyCaps = (sc) => (isMac ? [...sc] : sc.split("+"));
 
 const state = {
   contexts: [],
@@ -110,7 +113,7 @@ function safetyFolder(autos) {
   if (open) {
     if (autos.length) body = autos.map(rowHtml).join("");
     else body = `<p class="safety-empty">${enabled
-      ? "Rien pour l'instant. Reprise sauvegarde toute seule quand tu verrouilles ton Mac, qu'il se met en veille ou que tu t'absentes (sauf pendant une vidéo)."
+      ? `Rien pour l'instant. Reprise sauvegarde toute seule quand tu ${T.lockVerb}, qu'il se met en veille ou que tu t'absentes (sauf pendant une vidéo).`
       : "Désactivé : Reprise ne sauvegarde plus toute seule. Rallume l'interrupteur pour le réactiver."}</p>`;
   }
   return `
@@ -193,19 +196,19 @@ function section(ctx, kind, title, body, total) {
 }
 
 function shortPath(p) {
-  return p.replace(/^\/Users\/[^/]+/, "~");
+  return p.replace(/^\/Users\/[^/]+/, "~").replace(/^\/home\/[^/]+/, "~").replace(/^[A-Za-z]:\\Users\\[^\\]+/, "~");
 }
 
 function renderDetail() {
   const c = current();
   if (!state.contexts.length) {
-    const sc = prettyShortcut(state.settings?.shortcut_save || "Alt+Command+S");
+    const sc = prettyShortcut(state.settings?.shortcut_save || DEFAULTS.save);
     detailEl.innerHTML = `
       <div class="empty"><div class="empty-card">
         ${repeatSign("empty-sign")}
         <h2>Aucun contexte pour l'instant</h2>
         <p>Pendant que tu travailles, appuie sur ce raccourci. Reprise photographie tes apps, tes onglets, tes dossiers et tes fichiers ouverts, et te demande où tu en étais.</p>
-        <div class="keys">${[...sc].map((k) => `<span class="key">${esc(k)}</span>`).join("")}</div>
+        <div class="keys">${keyCaps(sc).map((k) => `<span class="key">${esc(k)}</span>`).join("")}</div>
         <div><button class="btn primary" data-action="capture">Sauvegarder ce qui est ouvert maintenant</button></div>
       </div></div>`;
     return;
@@ -232,7 +235,7 @@ function renderDetail() {
       <div class="note-edit-actions">
         <button class="btn primary" data-action="save-note">Enregistrer</button>
         <button class="btn ghost" data-action="cancel-note">Annuler</button>
-        <span class="muted small"><kbd>⌘</kbd> <kbd>↵</kbd> pour enregistrer</span>
+        <span class="muted small"><kbd>${isMac ? "⌘" : "Ctrl"}</kbd> <kbd>↵</kbd> pour enregistrer</span>
       </div>`;
   } else if (c.note) {
     noteHtml = `<button class="note-text" data-action="edit-note" title="Modifier la note"><span class="marker">${esc(c.note)}</span></button>`;
@@ -284,12 +287,12 @@ function renderDetail() {
           ${repeatSign()}<span>${state.restoring ? "Reprise en cours…" : "Reprendre"}</span>
         </button>
         <div class="resume-side">
-          <label class="switch">
+          ${isMac ? `<label class="switch">
             <input type="checkbox" id="tidy" ${tidy ? "checked" : ""}>
             <span class="track"></span>
             <span>Faire place nette</span>
-          </label>
-          <span class="resume-count">${tidy ? "Les autres apps seront masquées. " : ""}${selectedCount === c.items.length ? `Tout sera rouvert (${plural(c.items.length, "élément", "éléments")}).` : `${selectedCount} élément${selectedCount > 1 ? "s" : ""} sur ${c.items.length} seront rouverts.`}</span>
+          </label>` : ""}
+          <span class="resume-count">${isMac && tidy ? "Les autres apps seront masquées. " : ""}${selectedCount === c.items.length ? `Tout sera rouvert (${plural(c.items.length, "élément", "éléments")}).` : `${selectedCount} élément${selectedCount > 1 ? "s" : ""} sur ${c.items.length} seront rouverts.`}</span>
         </div>
       </div>
 
@@ -544,18 +547,19 @@ document.addEventListener("keydown", (e) => {
   const typing = e.target.closest("input, textarea, [contenteditable='plaintext-only'], [contenteditable='true']");
   const dialogOpen = document.querySelector("dialog[open]");
   if (dialogOpen) return;
-  if (e.metaKey && e.key === "f") { e.preventDefault(); searchEl.focus(); searchEl.select(); return; }
-  if (e.metaKey && e.key === ",") { e.preventDefault(); openSettings(); return; }
-  if (e.metaKey && e.key === "n") { e.preventDefault(); api.startCapture(); return; }
+  if (mod(e) && e.key === "f") { e.preventDefault(); searchEl.focus(); searchEl.select(); return; }
+  if (mod(e) && e.key === ",") { e.preventDefault(); openSettings(); return; }
+  if (mod(e) && e.key === "n") { e.preventDefault(); api.startCapture(); return; }
   if (e.key === "?" && !typing) { e.preventDefault(); openInfo(); return; }
   if (typing) return;
   if (e.key === "ArrowDown") { e.preventDefault(); moveSelection(1); }
   else if (e.key === "ArrowUp") { e.preventDefault(); moveSelection(-1); }
   else if (e.key === "Enter" && !e.target.closest("button")) { e.preventDefault(); restore(); }
-  else if (e.metaKey && e.key === "Backspace") { e.preventDefault(); remove(); }
+  else if (mod(e) && (e.key === "Backspace" || (!isMac && e.key === "Delete"))) { e.preventDefault(); remove(); }
 });
 
 $("#btn-capture").addEventListener("click", () => api.startCapture());
+$("#btn-settings").title = `Réglages (${appKey(",")})`;
 $("#btn-settings").addEventListener("click", () => openSettings());
 $("#btn-info").addEventListener("click", () => openInfo());
 
@@ -566,7 +570,7 @@ on("settings-changed", (s) => { state.settings = s; updateShortcutHints(); rende
 window.addEventListener("focus", () => load());
 
 function updateShortcutHints() {
-  $("#kbd-save").textContent = prettyShortcut(state.settings?.shortcut_save || "Alt+Command+S");
+  $("#kbd-save").textContent = prettyShortcut(state.settings?.shortcut_save || DEFAULTS.save);
 }
 
 // ───────────────────────────── Réglages ────────────────────────────
@@ -692,20 +696,20 @@ function renderSettings() {
       <div class="set-group">
         <h3>Habillage</h3>
         ${styleCards(s)}
-        ${toggleRow("seasonal", "Habillages de saison", "Halloween du 15 octobre au 2 novembre, Noël du 1er décembre au 6 janvier. L'icône du Dock change aussi, puis tout revient comme avant.")}
+        ${toggleRow("seasonal", "Habillages de saison", "Halloween du 15 octobre au 2 novembre, Noël du 1er décembre au 6 janvier. L'icône de " + (isMac ? "l'app dans le Dock" : "la fenêtre") + " change aussi, puis tout revient comme avant.")}
       </div>
 
       <div class="set-group">
         <h3>Comportement</h3>
-        ${toggleRow("tidy_by_default", "Faire place nette par défaut", "Masque les autres apps quand tu reprends un contexte.")}
+        ${isMac ? toggleRow("tidy_by_default", "Faire place nette par défaut", "Masque les autres apps quand tu reprends un contexte.") : ""}
         ${toggleRow("show_note", "Afficher le post-it « Tu en étais là »", "Un petit rappel de ta note, en haut à droite de l'écran.")}
-        ${toggleRow("launch_at_login", "Lancer Reprise à l'ouverture de session", "Discrètement, dans la barre des menus.")}
-        ${toggleRow("show_in_dock", "Icône dans le Dock", "Sinon, Reprise vit seulement dans la barre des menus.")}
+        ${toggleRow("launch_at_login", "Lancer Reprise à l'ouverture de session", `Discrètement, dans ${T.tray}.`)}
+        ${toggleRow("show_in_dock", T.dockIcon, T.dockHint)}
       </div>
 
       <div class="set-group">
         <h3>Filet de sécurité</h3>
-        ${toggleRow("auto_save", "Sauvegarder tout seul quand je m'absente", "Quand tu verrouilles ton Mac, qu'il se met en veille, ou après 5 minutes sans toucher au clavier (sauf si une vidéo ou un stream tourne). Reprise garde les 3 dernières, rangées dans le dossier « Filet de sécurité ».")}
+        ${toggleRow("auto_save", "Sauvegarder tout seul quand je m'absente", `Quand tu ${T.lockVerb}, qu'il se met en veille, ou après 5 minutes sans toucher au clavier (sauf si une vidéo ou un stream tourne). Reprise garde les 3 dernières, rangées dans le dossier « Filet de sécurité ».`)}
         ${toggleRow("welcome_back", "Me proposer de reprendre en revenant", "Un post-it « Tu étais sur… » après une absence.")}
         <div class="set-row ${s.welcome_back ? "" : "dim"}">
           <div class="label"><span>Après une absence de</span></div>
@@ -724,13 +728,13 @@ function renderSettings() {
           : `<p class="hint small" style="margin:0">Aucune pour l'instant. Dans la fenêtre de sauvegarde, clique sur « 4 apps » puis sur « Ne jamais enregistrer » à côté d'une app (Spotify, Messages, Discord…).</p>`}
       </div>
 
-      <div class="set-group">
+      ${isMac ? `<div class="set-group">
         <h3>Autorisations macOS</h3>
         ${permLine("automation", "Automatisation", "Pour lire et rouvrir tes onglets, tes dossiers et tes apps.")}
         ${permLine("accessibility", "Accessibilité", "Pour savoir quels fichiers sont ouverts dans tes apps.")}
         <div class="set-row"><span class="hint">La vérification peut faire apparaître les demandes de macOS.</span>
           <button class="btn" data-set="check-perms">${perms === "loading" ? "Vérification…" : "Vérifier"}</button></div>
-      </div>
+      </div>` : ""}
 
       <div class="set-group">
         <h3>Mises à jour</h3>
@@ -743,9 +747,9 @@ function renderSettings() {
 
       <div class="set-group">
         <h3>Tes données</h3>
-        <p class="hint small" style="margin:0">Tout reste sur ton Mac, dans un simple fichier. Rien n'est envoyé sur Internet.</p>
+        <p class="hint small" style="margin:0">Tout reste sur ${T.computer}, dans un simple fichier. Rien n'est envoyé sur Internet.</p>
         ${info ? `<div class="path">${esc(info.data_path)}</div>` : ""}
-        <button class="btn" data-set="reveal">Montrer dans le Finder</button>
+        <button class="btn" data-set="reveal">${T.reveal}</button>
       </div>
 
       <div class="set-group">
@@ -839,8 +843,8 @@ document.addEventListener("keydown", (e) => {
   }
   const key = /^(Key[A-Z]|Digit[0-9])$/.test(e.code) ? e.code : null;
   if (!key) return; // on attend une lettre ou un chiffre
-  if (!(e.metaKey || e.ctrlKey || e.altKey)) {
-    settingsError = "Ajoute au moins ⌘, ⌥ ou ⌃ à ta combinaison.";
+  if (!(e.ctrlKey || e.altKey || (isMac && e.metaKey))) {
+    settingsError = isMac ? "Ajoute au moins ⌘, ⌥ ou ⌃ à ta combinaison." : "Ajoute au moins Ctrl ou Alt à ta combinaison.";
     renderSettings();
     return;
   }
@@ -848,7 +852,7 @@ document.addEventListener("keydown", (e) => {
   if (e.ctrlKey) parts.push("Control");
   if (e.altKey) parts.push("Alt");
   if (e.shiftKey) parts.push("Shift");
-  if (e.metaKey) parts.push("Command");
+  if (e.metaKey && isMac) parts.push("Command");
   parts.push(key);
   const field = recording;
   recording = null;
@@ -998,9 +1002,9 @@ async function openInfo() {
 }
 
 function renderInfo() {
-  const save = prettyShortcut(state.settings?.shortcut_save || "Alt+Command+S");
-  const open = prettyShortcut(state.settings?.shortcut_open || "Alt+Command+R");
-  const resume = prettyShortcut(state.settings?.shortcut_resume || "Alt+Shift+Command+R");
+  const save = prettyShortcut(state.settings?.shortcut_save || DEFAULTS.save);
+  const open = prettyShortcut(state.settings?.shortcut_open || DEFAULTS.open);
+  const resume = prettyShortcut(state.settings?.shortcut_resume || DEFAULTS.resume);
   infoEl.innerHTML = `
     <div class="sheet-head">
       <h2 id="info-title">Comment marche Reprise</h2>
@@ -1018,26 +1022,34 @@ function renderInfo() {
       </ol>
 
       <h3>Le filet de sécurité</h3>
-      <p>Tu as oublié d'appuyer sur ${esc(save)} ? Pas grave. Quand tu verrouilles ton Mac, qu'il se met en veille ou que tu ne touches plus au clavier pendant 5 minutes, Reprise sauvegarde toute seule. Elle garde les 3 dernières sauvegardes, en bas de la liste. Si l'une d'elles est importante, clique sur « Garder ce contexte ».</p>
-      <p>Et quand tu reviens après une vraie absence (Mac verrouillé ou en veille), un post-it te demande : « Tu étais sur… on reprend ? »</p>
+      <p>Tu as oublié d'appuyer sur ${esc(save)} ? Pas grave. Quand tu ${T.lockVerb}, qu'il se met en veille ou que tu ne touches plus au clavier pendant 5 minutes, Reprise sauvegarde toute seule (sauf pendant une vidéo). Elle garde les 3 dernières sauvegardes dans le dossier « Filet de sécurité », en haut de la liste. Si l'une d'elles est importante, clique sur « Garder ce contexte ».</p>
+      <p>Et quand tu reviens après une vraie absence (écran verrouillé ou mise en veille), un post-it te demande : « Tu étais sur… on reprend ? »</p>
 
       <h3>Ce qui est enregistré</h3>
-      <ul>
-        <li>Les <strong>apps</strong> ouvertes (celles qui ont une icône dans le Dock).</li>
+      ${isMac ? `<ul>
+        <li>${T.appsCaptured}</li>
         <li>Les <strong>onglets</strong> de Safari, Chrome, Brave, Edge, Arc, Vivaldi, Opera et Opera GX, fenêtre par fenêtre.</li>
-        <li>Les <strong>dossiers</strong> ouverts dans le Finder.</li>
+        <li>${T.foldersCaptured}</li>
         <li>Les <strong>fichiers</strong> ouverts dans tes apps (PDF, Pages, Keynote, VS Code…), si l'accès Accessibilité est autorisé.</li>
         <li>La <strong>place et la taille</strong> de chaque fenêtre, y compris sur un deuxième écran. Si cet écran n'est plus branché, la fenêtre reste sur l'écran principal.</li>
       </ul>
-      <p class="muted">Ce qui ne l'est pas : ce qu'il y a <em>dans</em> les apps (la chanson en cours, un texte pas encore enregistré, la position dans une vidéo), les onglets de Firefox et souvent ceux de navigation privée. C'est pour ça que ta phrase compte.</p>
+      <p class="muted">Ce qui ne l'est pas : ce qu'il y a <em>dans</em> les apps (la chanson en cours, un texte pas encore enregistré, la position dans une vidéo), les onglets de Firefox et souvent ceux de navigation privée. C'est pour ça que ta phrase compte.</p>` : `<ul>
+        <li>${T.appsCaptured}</li>
+        <li>Les <strong>onglets</strong> de Chrome, Edge, Firefox, Brave, Vivaldi, Opera et Opera GX, fenêtre par fenêtre.</li>
+        ${T.foldersCaptured ? `<li>${T.foldersCaptured}</li>` : ""}
+        <li>${T.filesCaptured}</li>
+      </ul>
+      <p class="muted">Ce qui ne l'est pas : ce qu'il y a <em>dans</em> les apps, la place exacte des fenêtres, et les onglets de navigation privée. Un onglet ouvert il y a moins de quelques secondes peut aussi manquer. C'est pour ça que ta phrase compte.</p>`}
 
       <h3>Comment ça marche, en coulisses</h3>
-      <p>Pour savoir ce qui est ouvert, Reprise pose la question à macOS en <strong>AppleScript</strong>, le langage intégré au Mac pour piloter les apps. macOS répond avec le nom de chaque app et son identifiant unique (par exemple <code>com.apple.Safari</code>), puis les navigateurs et le Finder donnent leurs onglets et leurs dossiers.</p>
+      ${isMac ? `<p>Pour savoir ce qui est ouvert, Reprise pose la question à macOS en <strong>AppleScript</strong>, le langage intégré au Mac pour piloter les apps. macOS répond avec le nom de chaque app et son identifiant unique (par exemple <code>com.apple.Safari</code>), puis les navigateurs et le Finder donnent leurs onglets et leurs dossiers.</p>
       <p>Pour reprendre, Reprise fait l'inverse : elle relance chaque app avec la commande <code>open</code>, comme un double-clic, recrée les fenêtres de navigateur avec leurs onglets dans l'ordre, et rouvre les dossiers et les fichiers.</p>
-      <p>C'est pour ça que macOS demande deux autorisations : <strong>Automatisation</strong> (piloter tes apps) et <strong>Accessibilité</strong> (voir les fichiers ouverts, facultatif).</p>
+      <p>C'est pour ça que macOS demande deux autorisations : <strong>Automatisation</strong> (piloter tes apps) et <strong>Accessibilité</strong> (voir les fichiers ouverts, facultatif).</p>` : `<p>Pour savoir ce qui est ouvert, Reprise regarde quels programmes ont une fenêtre${isMac ? "" : (T.foldersCaptured ? ", demande à l'Explorateur ses dossiers ouverts" : "")}, et lit le fichier où chaque navigateur note lui-même ses onglets (celui qui lui sert à tout rouvrir après un plantage). Elle ne fait que lire : rien n'est modifié.</p>
+      <p>Pour reprendre, Reprise relance chaque app comme un double-clic, rouvre une fenêtre de navigateur par fenêtre sauvegardée avec ses onglets, puis les dossiers et les fichiers.</p>
+      <p>Aucune autorisation spéciale n'est nécessaire.</p>`}
 
       <h3>Tes données</h3>
-      <p>Tout est rangé dans un simple fichier sur ton Mac. Aucun compte, aucune pub, aucun traceur. La seule connexion à Internet sert à vérifier s'il existe une nouvelle version sur GitHub, et tu peux la couper dans les réglages.</p>
+      <p>Tout est rangé dans un simple fichier sur ${T.computer}. Aucun compte, aucune pub, aucun traceur. La seule connexion à Internet sert à vérifier s'il existe une nouvelle version sur GitHub, et tu peux la couper dans les réglages.</p>
 
       <h3>Les mises à jour</h3>
       <p>Quand une nouvelle version sort, un bouton « Mettre à jour » apparaît en haut de la fenêtre. Un clic, et Reprise la télécharge, vérifie sa signature (pour être sûre qu'elle vient bien de GitHub et que personne ne l'a modifiée), l'installe et redémarre. Tes contextes et tes réglages restent intacts.</p>
@@ -1049,9 +1061,9 @@ function renderInfo() {
         <tr><td><kbd>${esc(resume)}</kbd></td><td>Reprendre le dernier contexte, depuis n'importe où</td></tr>
         <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Passer d'un contexte à l'autre</td></tr>
         <tr><td><kbd>↵</kbd></td><td>Reprendre le contexte choisi</td></tr>
-        <tr><td><kbd>⌘F</kbd></td><td>Chercher</td></tr>
-        <tr><td><kbd>⌘N</kbd></td><td>Sauvegarder maintenant</td></tr>
-        <tr><td><kbd>⌘⌫</kbd></td><td>Supprimer (avec « Annuler »)</td></tr>
+        <tr><td><kbd>${appKey("F")}</kbd></td><td>Chercher</td></tr>
+        <tr><td><kbd>${appKey("N")}</kbd></td><td>Sauvegarder maintenant</td></tr>
+        <tr><td><kbd>${isMac ? "⌘⌫" : "Ctrl+Suppr"}</kbd></td><td>Supprimer (avec « Annuler »)</td></tr>
       </table>
 
       <h3>Développement</h3>
@@ -1085,13 +1097,13 @@ const welcomeEl = $("#welcome");
 let step = 0;
 
 function renderWelcome() {
-  const sc = prettyShortcut(state.settings?.shortcut_save || "Alt+Command+S");
+  const sc = prettyShortcut(state.settings?.shortcut_save || DEFAULTS.save);
   const steps = [
     `<h2 id="welcome-title">Reprends là où tu t'étais arrêté</h2>
      <p>Quand tu dois t'interrompre, appuie sur ce raccourci. Reprise photographie tes apps, tes onglets, tes dossiers et tes fichiers ouverts, et te demande en une phrase où tu en étais.</p>
-     <div class="keys">${[...sc].map((k) => `<span class="key">${esc(k)}</span>`).join("")}</div>
+     <div class="keys">${keyCaps(sc).map((k) => `<span class="key">${esc(k)}</span>`).join("")}</div>
      <p>Plus tard, un clic sur « Reprendre » remet tout en place, avec ta phrase affichée en haut de l'écran.</p>`,
-    `<h2 id="welcome-title">Deux autorisations</h2>
+    isMac && `<h2 id="welcome-title">Deux autorisations</h2>
      <p>macOS va te demander si Reprise peut piloter tes apps. C'est ce qui lui permet de lire puis de rouvrir ton travail. Tout reste sur ton Mac.</p>
      <div class="perm-card"><div class="perm"><div><div class="what">Automatisation</div><div class="why">Onglets, dossiers du Finder, apps ouvertes.</div></div>
        <span class="perm"><span class="perm-dot ${perms?.automation || ""}"></span><button class="btn ghost" data-w="pane" data-kind="automation">Réglages</button></span></div></div>
@@ -1102,7 +1114,7 @@ function renderWelcome() {
      <p>Je te montre où est chaque chose, sur un exemple. Tu pourras la revoir quand tu veux avec le bouton <strong>i</strong>, en haut de la fenêtre.</p>
      <div class="set-row"><div class="label"><span>Lancer Reprise à l'ouverture de session</span><span class="hint">Pour que le filet de sécurité soit toujours là.</span></div>
        <label class="switch"><input type="checkbox" data-w="login" ${state.settings?.launch_at_login ? "checked" : ""}><span class="track"></span></label></div>`,
-  ];
+  ].filter(Boolean);
   welcomeEl.innerHTML = `
     <div class="sheet-body">
       <div class="step-count">Étape ${step + 1} sur ${steps.length}</div>
@@ -1167,7 +1179,7 @@ function demoContexts() {
         it("v1", "app", "Keynote", "Keynote", "k"), it("v2", "app", "Safari", "Safari", "s"),
         it("v3", "tab", "Safari", "La guerre froide en 10 dates – Lumni", "https://www.lumni.fr/dossier/la-guerre-froide", 1),
         it("v4", "tab", "Safari", "Crise des missiles de Cuba — Wikipédia", "https://fr.wikipedia.org/wiki/Crise_des_missiles_de_Cuba", 1),
-        it("v5", "folder", "Finder", "Histoire", "/Users/toi/Documents/Histoire"),
+        it("v5", "folder", isMac ? "Finder" : "Explorateur", "Histoire", isMac ? "/Users/toi/Documents/Histoire" : "C:\\Users\\toi\\Documents\\Histoire"),
         it("v6", "document", "Keynote", "Exposé.key", "/Users/toi/Documents/Histoire/Exposé.key"),
       ],
     },
@@ -1192,17 +1204,17 @@ function runTour() {
   detailEl.scrollTop = 0;
 
   const s = state.settings || {};
-  const save = prettyShortcut(s.shortcut_save || "Alt+Command+S");
-  const resume = prettyShortcut(s.shortcut_resume || "Alt+Shift+Command+R");
+  const save = prettyShortcut(s.shortcut_save || DEFAULTS.save);
+  const resume = prettyShortcut(s.shortcut_resume || DEFAULTS.resume);
   startTour([
     { title: "Voici un exemple", text: "Pour la visite, j'ai préparé un faux contexte : un exposé d'histoire en cours. Rien n'est enregistré, il disparaîtra à la fin." },
     { target: "#btn-capture", title: "Sauvegarder", text: `Le geste principal : <strong>${esc(save)}</strong>, depuis n'importe quelle app. Ce bouton fait la même chose.` },
-    { target: "#list", title: "Tes contextes", text: "Ils sont rangés par jour, les épinglés en haut. Cherche dans les noms, les notes et les onglets avec <strong>⌘F</strong>." },
+    { target: "#list", title: "Tes contextes", text: `Ils sont rangés par jour, les épinglés en haut. Cherche dans les noms, les notes et les onglets avec <strong>${appKey("F")}</strong>.` },
     { target: ".note-block", title: "Où tu en étais", text: "La phrase que tu écris en sauvegardant, surlignée pour la voir tout de suite. Clique dessus pour la modifier." },
-    { target: ".resume-bar", title: "Reprendre", text: `Un clic rouvre tout, fenêtres à leur place. « Faire place nette » masque le reste. Depuis n'importe où : <strong>${esc(resume)}</strong>.` },
+    { target: ".resume-bar", title: "Reprendre", text: `Un clic rouvre tout${isMac ? ", fenêtres à leur place. « Faire place nette » masque le reste" : ""}. Depuis n'importe où : <strong>${esc(resume)}</strong>.` },
     { target: ".section", title: "Choisir ce qu'on rouvre", text: "Décoche ce dont tu n'as plus besoin. Survole une ligne pour rouvrir un seul élément." },
-    { target: ".group-title.safety", title: "Le filet de sécurité", text: "Si tu oublies de sauvegarder, Reprise le fait toute seule quand tu verrouilles ton Mac ou que tu t'absentes. Elle garde les 3 dernières ici." },
-    { target: ".top-actions", title: "Aide et réglages", text: "Le <strong>i</strong> explique tout, la roue règle les polices, les raccourcis et le filet. Reprise vit aussi dans la barre des menus, en haut à droite de l'écran." },
+    { target: ".safety-folder", title: "Le filet de sécurité", text: `Si tu oublies de sauvegarder, Reprise le fait toute seule quand tu ${T.lockVerb} ou que tu t'absentes. Elle garde les 3 dernières dans ce dossier, et l'interrupteur la coupe.` },
+    { target: ".top-actions", title: "Aide et réglages", text: `Le <strong>i</strong> explique tout, la roue règle les polices, les habillages, les raccourcis et le filet. Reprise vit aussi dans ${T.tray}.` },
     { title: "À toi de jouer", text: `Va dans une autre app, ouvre ce sur quoi tu travailles, et appuie sur <strong>${esc(save)}</strong>. Écris ta phrase, Entrée, c'est sauvegardé.` },
   ], {
     doneLabel: "C'est parti",
@@ -1221,11 +1233,11 @@ function runTour() {
 // ───────────────────────────── Nouveautés ──────────────────────────
 
 const WHATS_NEW = [
-  ["Les fenêtres reviennent à leur place", "Position et taille, y compris sur un deuxième écran."],
-  ["Le filet de sécurité", "Reprise sauvegarde toute seule quand tu verrouilles ton Mac ou que tu t'absentes."],
-  ["« Tu étais sur… »", "En revenant, un post-it te propose de reprendre."],
-  ["Reprendre le dernier contexte en un raccourci", "⌥⇧⌘R, depuis n'importe quelle app."],
-  ["Les mises à jour s'installent toutes seules", "Un clic, Reprise redémarre à jour."],
+  ["Reprise arrive sur Windows et Linux", "Apps, onglets, fichiers, filet de sécurité et habillages, comme sur Mac."],
+  ["Les habillages", "Forêt, Océan, et Halloween ou Noël qui arrivent tout seuls à leur saison (Réglages › Habillage)."],
+  ["Le dossier « Filet de sécurité »", "Les sauvegardes auto sont rangées en haut de la liste, avec un interrupteur."],
+  ["Pas de sauvegarde pendant une vidéo", "YouTube, un film, un stream : Reprise sait que tu es là."],
+  ["Opera et Opera GX", "Leurs onglets sont sauvegardés et rouverts, fenêtre par fenêtre."],
 ];
 
 function showWhatsNew(version) {

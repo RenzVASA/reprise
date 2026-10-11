@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Reprise, pour reprendre là où tu t'étais arrêté</title>
-  <meta name="description" content="Une app gratuite pour Mac : sauvegarde tes apps, onglets et dossiers ouverts en un raccourci, avec une phrase « où j'en étais », et remets tout en place en un clic.">
+  <meta name="description" content="Une app gratuite pour Mac, Windows et Linux : sauvegarde tes apps, onglets et dossiers ouverts en un raccourci, avec une phrase « où j'en étais », et remets tout en place en un clic.">
   <meta property="og:title" content="Reprise, pour reprendre là où tu t'étais arrêté">
-  <meta property="og:description" content="Un raccourci sauvegarde tes apps, tes onglets et tes dossiers. Un clic remet tout en place. Gratuit, pour Mac.">
+  <meta property="og:description" content="Un raccourci sauvegarde tes apps, tes onglets et tes dossiers. Un clic remet tout en place. Gratuit, pour Mac, Windows et Linux.">
   <meta property="og:image" content="screenshots/main_light.png">
   <link rel="icon" href="icon.png">
   <style>
@@ -109,6 +109,7 @@
     .chips li { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: .35rem .9rem; font-weight: 700; font-size: .95rem; }
     .chips li.new::after { content: "nouveau"; margin-left: .45rem; font-size: .72rem; color: var(--ribbon); background: var(--ribbon-soft); border-radius: 1em; padding: .1em .5em; }
     .chips li.no { color: var(--ink-3); font-weight: 400; }
+    .chips small { font-weight: 400; color: var(--ink-2); }
 
     /* Installation et confiance */
     .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.2rem; }
@@ -150,8 +151,8 @@
         <h1>Reprends là où tu t'étais arrêté.</h1>
         <p class="lede">Un raccourci sauvegarde tes apps, tes onglets, tes dossiers et tes fichiers ouverts, avec une phrase : <span class="m">où j'en étais</span>. Un clic remet tout en place.</p>
         <div class="cta">
-          <a class="btn" href="https://github.com/RenzVASA/reprise/releases/latest">Télécharger pour Mac</a>
-          <span class="fine">Gratuit et open source. Mac Apple Silicon, macOS 11 ou plus récent.<br>Se met à jour tout seul.</span>
+          <a class="btn" href="https://github.com/RenzVASA/reprise/releases/latest">Télécharger</a>
+          <span class="fine">Gratuit et open source. <strong>Mac</strong> (Apple Silicon), <strong>Windows</strong> 10 et 11, <strong>Linux</strong>.<br>Se met à jour tout seul.</span>
         </div>
       </div>
     </div>
@@ -182,7 +183,7 @@
           <li><strong>Polices de lecture</strong> : Atkinson Hyperlegible, Lexend, OpenDyslexic, et la taille du texte se règle.</li>
           <li><strong>Faire place nette</strong> : masque tout le reste quand tu reprends.</li>
           <li><strong>Les fenêtres reviennent à leur place</strong>, même sur un deuxième écran.</li>
-          <li><strong>Tout reste sur ton Mac.</strong> Aucun compte, aucun traceur.</li>
+          <li><strong>Tout reste sur ton ordinateur.</strong> Aucun compte, aucun traceur.</li>
         </ul>
       </div>
       <div class="pics">
@@ -196,7 +197,7 @@
         <p class="kicker">Filet de sécurité</p>
         <h2 id="filet-titre">Tu as oublié de sauvegarder ? Reprise l'a fait.</h2>
         <ul>
-          <li><strong>Quand tu verrouilles ton Mac</strong>, qu'il se met en veille ou que tu t'absentes, Reprise garde une photo de ce qui était ouvert.</li>
+          <li><strong>Quand tu verrouilles ton ordinateur</strong>, qu'il se met en veille ou que tu t'absentes, Reprise garde une photo de ce qui était ouvert.</li>
           <li><strong>Jamais pendant une vidéo.</strong> YouTube, un film, un stream : tant qu'une app garde l'écran allumé, Reprise sait que tu es là.</li>
           <li><strong>Rangé dans un dossier</strong> en haut de la liste, plié par défaut. Les 3 dernières sauvegardes sont gardées.</li>
           <li><strong>Un interrupteur</strong> sur le dossier le coupe ou le rallume en un geste.</li>
@@ -236,7 +237,7 @@
           <img src="screenshots/icons/halloween.png" alt="Icône Halloween, avec des citrouilles" width="256" height="256" loading="lazy">
           <img src="screenshots/icons/noel.png" alt="Icône Noël, avec des boules de sapin" width="256" height="256" loading="lazy">
         </div>
-        <p><strong>L'icône du Dock suit l'habillage</strong> tant que Reprise est ouverte. La neige s'arrête si tu as activé « Réduire les animations ».</p>
+        <p><strong>L'icône suit l'habillage</strong>, dans le Dock sur Mac et dans la barre des tâches sur Windows et Linux, tant que Reprise est ouverte. La neige s'arrête si tu as activé « Réduire les animations ».</p>
       </div>
       <div class="notes">
         <img src="screenshots/note_halloween.png" alt="Le post-it en habillage Halloween, avec une citrouille" width="720" height="420" loading="lazy">
@@ -248,8 +249,8 @@
       <p class="kicker">Navigateurs</p>
       <h2 id="nav-titre">Tes onglets, fenêtre par fenêtre.</h2>
       <ul class="chips">
-        <li>Safari</li><li>Chrome</li><li>Brave</li><li>Edge</li><li>Arc</li><li>Vivaldi</li><li class="new">Opera</li><li class="new">Opera GX</li>
-        <li class="no">Firefox : l'app est rouverte, mais il ne laisse pas lire ses onglets</li>
+        <li>Chrome</li><li>Edge</li><li>Brave</li><li>Vivaldi</li><li>Opera</li><li>Opera GX</li><li>Safari <small>(Mac)</small></li><li>Arc <small>(Mac)</small></li><li class="new">Firefox <small>(Windows, Linux)</small></li>
+        <li class="no">Sur Mac, Firefox ne laisse pas lire ses onglets : l'app est rouverte quand même</li>
       </ul>
     </section>
 
@@ -259,12 +260,13 @@
       <div class="cards">
         <div class="card">
           <h3>Installer</h3>
-          <ol>
-            <li>Télécharge le fichier <code>.dmg</code> de la <a href="https://github.com/RenzVASA/reprise/releases/latest">dernière version</a>.</li>
-            <li>Glisse Reprise dans le dossier Applications.</li>
-            <li>La première fois seulement, ouvre le Terminal et colle <code>xattr -cr /Applications/Reprise.app</code>, puis lance l'app. Une petite visite guidée t'explique tout.</li>
-          </ol>
-          <p>Ensuite, Reprise se met à jour toute seule : elle te prévient, tu cliques, elle redémarre à jour.</p>
+          <p style="margin-top:0">Tout est sur la page de la <a href="https://github.com/RenzVASA/reprise/releases/latest">dernière version</a>.</p>
+          <ul>
+            <li><strong>Mac</strong> : ouvre le <code>.dmg</code> et glisse Reprise dans Applications. La première fois seulement, ouvre le Terminal et colle <code>xattr -cr /Applications/Reprise.app</code>.</li>
+            <li><strong>Windows</strong> : lance le fichier <code>-setup.exe</code>. Si Windows affiche « Windows a protégé votre ordinateur », clique sur <em>Informations complémentaires</em>, puis <em>Exécuter quand même</em>.</li>
+            <li><strong>Linux</strong> : rends l'<code>.AppImage</code> exécutable et lance-la, ou installe le <code>.deb</code> sur Debian, Ubuntu ou Mint.</li>
+          </ul>
+          <p>Une petite visite guidée t'explique tout. Ensuite, Reprise se met à jour toute seule : elle te prévient, tu cliques, elle redémarre à jour.</p>
         </div>
         <div class="card">
           <h3>Pourquoi tu peux lui faire confiance</h3>
@@ -272,8 +274,8 @@
             <li><strong>Code ouvert</strong> : tout est lisible sur <a href="https://github.com/RenzVASA/reprise">GitHub</a>.</li>
             <li><strong>Fabriquée par GitHub</strong> à partir de ce code, avec une preuve de provenance et une empreinte SHA-256 publiées à chaque version.</li>
             <li><strong>Mises à jour signées</strong> : Reprise refuse toute mise à jour qui ne porte pas la signature de son auteur.</li>
-            <li><strong>Signée RenzVASA</strong> : macOS reconnaît l'app d'une version à l'autre et garde tes autorisations.</li>
-            <li><strong>Rien ne sort de ton Mac.</strong> La seule connexion sert à vérifier s'il y a une nouvelle version, et elle se coupe.</li>
+            <li><strong>Signée RenzVASA sur Mac</strong> : macOS reconnaît l'app d'une version à l'autre et garde tes autorisations.</li>
+            <li><strong>Rien ne sort de ton ordinateur.</strong> La seule connexion sert à vérifier s'il y a une nouvelle version, et elle se coupe.</li>
           </ul>
         </div>
       </div>

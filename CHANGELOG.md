@@ -1,5 +1,12 @@
 # Nouveautés de Reprise
 
+## 1.4.0
+
+- Reprise arrive sur **Windows** (10 et 11) et **Linux**. Elle sauvegarde les apps ouvertes, les onglets de Chrome, Edge, Firefox, Brave, Vivaldi, Opera et Opera GX (fenêtre par fenêtre), les dossiers de l'Explorateur et les fichiers ouverts, puis remet tout en place d'un clic.
+- Sur Windows et Linux aussi : filet de sécurité (verrouillage, veille, absence, mais jamais pendant une vidéo), post-it « Tu étais sur… », habillages de saison, mises à jour automatiques signées.
+- Raccourcis sur Windows et Linux : Ctrl+Alt+S pour sauvegarder, Ctrl+Alt+R pour ouvrir Reprise, Ctrl+Alt+Maj+R pour reprendre le dernier contexte.
+- Mac : rien ne change, à part la visite guidée qui montre bien le dossier « Filet de sécurité ».
+
 ## 1.3.0
 
 - Habillages : en plus du Classique, Reprise peut s'habiller en Forêt ou en Océan (Réglages › Habillage). Chacun a son mode clair et son mode sombre, son surligneur, son post-it et son icône dans le Dock.

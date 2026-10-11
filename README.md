@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Sauvegarde ton contexte de travail en un raccourci. Reprends-le en un clic.</strong><br>
-  Pour Mac Apple Silicon (M1 et suivants) · gratuit · open source · tout reste sur ton Mac
+  Pour Mac, Windows et Linux · gratuit · open source · tout reste sur ton ordinateur
 </p>
 
 <p align="center">
@@ -27,11 +27,11 @@ Quand tu reviens, tout est mélangé, et tu perds vingt minutes à te souvenir d
 
 ## Ce que fait Reprise
 
-1. **Tu appuies sur ⌥⌘S.** Reprise photographie tes apps ouvertes, les onglets de tes navigateurs, tes dossiers du Finder et les fichiers ouverts dans tes apps.
+1. **Tu appuies sur ⌥⌘S** (Ctrl+Alt+S sur Windows et Linux). Reprise photographie tes apps ouvertes, les onglets de tes navigateurs, tes dossiers et les fichiers ouverts dans tes apps.
 2. **Tu écris une phrase : « où j'en étais ».** C'est elle qui fait toute la différence le lendemain. Des débuts de phrase sont proposés pour ne jamais rester bloqué devant une page blanche.
 3. **Plus tard, tu cliques sur « Reprendre ».** Tout se rouvre, chaque fenêtre à sa place et à sa taille, et ta phrase s'affiche sur un post-it en haut de l'écran.
 
-Et si tu oublies d'appuyer sur ⌥⌘S ? Le **filet de sécurité** s'en occupe : Reprise sauvegarde toute seule quand tu verrouilles ton Mac, qu'il se met en veille ou que tu t'absentes. En revenant, un post-it te demande : « Tu étais sur… on reprend ? »
+Et si tu oublies d'appuyer sur le raccourci ? Le **filet de sécurité** s'en occupe : Reprise sauvegarde toute seule quand tu verrouilles ton ordinateur, qu'il se met en veille ou que tu t'absentes. En revenant, un post-it te demande : « Tu étais sur… on reprend ? »
 
 <p align="center">
   <img src="docs/screenshots/capture.png" width="380" alt="La fenêtre de sauvegarde">
@@ -69,37 +69,56 @@ Reprise est utile à tout le monde, mais il a été pensé d'abord pour les pers
 
 ## Installation
 
-1. Télécharge le fichier `.dmg` depuis la page [Releases](https://github.com/RenzVASA/reprise/releases/latest).
-2. Ouvre-le et glisse **Reprise** dans **Applications**.
-3. Reprise n'est pas signée par Apple (un compte développeur coûte 99 $ par an). macOS va donc dire que l'app est « endommagée » : ce n'est pas vrai, c'est juste qu'il ne la connaît pas. Ouvre le **Terminal** et colle :
+Tout se télécharge sur la page [Releases](https://github.com/RenzVASA/reprise/releases/latest).
+
+### Mac (Apple Silicon, macOS 11 ou plus récent)
+
+1. Télécharge le fichier `.dmg`, ouvre-le et glisse **Reprise** dans **Applications**.
+2. Reprise n'est pas signée par Apple (un compte développeur coûte 99 $ par an). macOS va donc dire que l'app est « endommagée » : ce n'est pas vrai, c'est juste qu'il ne la connaît pas. Ouvre le **Terminal** et colle :
 
    ```bash
    xattr -cr /Applications/Reprise.app
    ```
 
-4. Lance Reprise. Un petit accueil en trois étapes t'explique tout.
+3. Lance Reprise. Un petit accueil t'explique tout.
+
+### Windows 10 et 11
+
+1. Télécharge le fichier `Reprise_…_x64-setup.exe` et lance-le. Pas besoin d'être administrateur.
+2. Windows peut afficher « Windows a protégé votre ordinateur » : Reprise n'a pas de certificat Microsoft payant. Clique sur **Informations complémentaires**, puis **Exécuter quand même**.
+3. Reprise s'ouvre, et vit ensuite près de l'horloge, dans la zone de notification.
+
+### Linux
+
+- **N'importe quelle distribution** : télécharge l'`.AppImage`, rends-la exécutable (`chmod +x Reprise_*.AppImage`) et lance-la. C'est cette version qui se met à jour toute seule.
+- **Debian, Ubuntu, Mint…** : `sudo apt install ./Reprise_*_amd64.deb`.
+
+Le mieux est un bureau GNOME ou KDE. Sous Wayland, les raccourcis globaux peuvent ne pas marcher dans toutes les apps : l'icône dans la zone de notification fait la même chose.
 
 ### Vérifier que le fichier est authentique
 
-Chaque version publie l'**empreinte SHA-256** de son `.dmg` (dans le texte de la Release et dans un fichier `.sha256` à côté). C'est une sorte d'empreinte digitale : si le fichier a été modifié, même d'un seul octet, l'empreinte change complètement.
+Chaque version publie l'**empreinte SHA-256** de chaque installateur (dans le texte de la Release et dans le fichier `SHA256SUMS.txt`). C'est une sorte d'empreinte digitale : si le fichier a été modifié, même d'un seul octet, l'empreinte change complètement.
 
 ```bash
-shasum -a 256 ~/Downloads/Reprise_*_aarch64.dmg
+shasum -a 256 ~/Downloads/Reprise_*_aarch64.dmg        # Mac
+sha256sum ~/Downloads/Reprise_*.AppImage                # Linux
 ```
+
+Sous Windows, dans PowerShell : `Get-FileHash $HOME\Downloads\Reprise_*_x64-setup.exe`.
 
 Compare le résultat avec l'empreinte affichée sur la page de la Release : les deux doivent être identiques.
 
-Le `.dmg` est fabriqué directement par GitHub Actions à partir du code public de ce dépôt, et GitHub signe sa provenance. Pour le vérifier (avec l'outil [GitHub CLI](https://cli.github.com)) :
+Chaque installateur est fabriqué directement par GitHub Actions à partir du code public de ce dépôt, et GitHub signe sa provenance. Pour le vérifier (avec l'outil [GitHub CLI](https://cli.github.com)) :
 
 ```bash
-gh attestation verify ~/Downloads/Reprise_*_aarch64.dmg -R RenzVASA/reprise
+gh attestation verify <le fichier téléchargé> -R RenzVASA/reprise
 ```
 
-### Signée RenzVASA
+### Signée RenzVASA (Mac)
 
-Depuis la version 1.1.2, l'app est signée avec le certificat RenzVASA. Ce n'est pas un certificat payant d'Apple (d'où la commande `xattr` ci-dessus), mais il permet à macOS de reconnaître Reprise d'une version à l'autre : tes autorisations (Automatisation, Accessibilité) restent en place après chaque mise à jour.
+Depuis la version 1.1.2, l'app Mac est signée avec le certificat RenzVASA. Ce n'est pas un certificat payant d'Apple (d'où la commande `xattr` ci-dessus), mais il permet à macOS de reconnaître Reprise d'une version à l'autre : tes autorisations (Automatisation, Accessibilité) restent en place après chaque mise à jour.
 
-### Les autorisations demandées
+### Les autorisations demandées (Mac)
 
 macOS protège tes apps, donc il va te demander deux choses :
 
@@ -108,27 +127,35 @@ macOS protège tes apps, donc il va te demander deux choses :
 
 Tu peux revoir ces autorisations à tout moment dans **Réglages Système › Confidentialité et sécurité**, ou depuis les réglages de Reprise.
 
+Sous Windows et Linux, aucune autorisation n'est demandée.
+
 ### Tes données
 
-Tout est stocké dans un simple fichier JSON sur ton Mac :
-`~/Library/Application Support/io.github.renzvasa.reprise/contexts.json`.
+Tout est stocké dans un simple fichier JSON sur ton ordinateur :
+
+- Mac : `~/Library/Application Support/io.github.renzvasa.reprise/contexts.json`
+- Windows : `%APPDATA%\io.github.renzvasa.reprise\contexts.json`
+- Linux : `~/.local/share/io.github.renzvasa.reprise/contexts.json`
+
 Rien n'est envoyé sur Internet. Aucun compte, aucune pub, aucun traceur. La seule connexion sert à demander à GitHub s'il existe une nouvelle version, et elle se coupe dans les réglages.
 
 ## Limites connues
 
-- **Firefox** ne laisse pas les autres apps lire ses onglets : l'app est sauvegardée, mais pas les onglets.
+- **Sur Mac, Firefox** ne laisse pas les autres apps lire ses onglets : l'app est sauvegardée, mais pas les onglets.
 - Les onglets de **navigation privée** ne sont pas toujours lisibles.
 - Une app qui n'expose pas ses fichiers ouverts à l'accessibilité sera rouverte, mais sans ses fichiers.
+- **Sur Windows et Linux**, les onglets sont lus dans le fichier où chaque navigateur note sa session : il le met à jour toutes les quelques secondes, donc un onglet ouvert à l'instant peut manquer. Les fichiers retrouvés sont ceux que tu as ouverts en double-cliquant dessus, pas ceux ouverts depuis l'app. La place des fenêtres et « Faire place nette » n'existent que sur Mac pour l'instant.
+- **Sur Linux**, les dossiers ouverts dans le gestionnaire de fichiers ne sont pas encore retrouvés.
 - Reprise rouvre les choses, elle ne peut pas restaurer l'état exact d'une app (position dans une vidéo, texte non enregistré…). C'est le rôle de ta phrase « où j'en étais ».
 
 ## Compiler soi-même
 
-Il te faut [Node.js](https://nodejs.org) et [Rust](https://rustup.rs).
+Il te faut [Node.js](https://nodejs.org) et [Rust](https://rustup.rs). Sous Windows, il faut aussi les **Visual Studio Build Tools** (« Développement Desktop en C++ ») ; sous Linux, les bibliothèques de WebKitGTK (voir [les prérequis de Tauri](https://v2.tauri.app/start/prerequisites/)).
 
 ```bash
 npm install          # installe l'outil Tauri
 npm run dev          # lance Reprise en mode développement
-npm run build        # fabrique Reprise.app et le .dmg dans src-tauri/target/release/bundle/
+npm run build        # fabrique l'app et son installateur dans src-tauri/target/release/bundle/
 ```
 
 `npm run build` signe aussi l'archive de mise à jour : il lui faut la clé privée. Si tu l'as créée avec le script de publication, elle est dans `~/.tauri/reprise.key` :
@@ -143,7 +170,11 @@ Pour travailler le design sans lancer l'app : `npm run apercu`, puis ouvre <http
 
 ### Comment c'est construit
 
-- **Tauri 2 + Rust** pour le cœur : capture et reprise via AppleScript (`osascript`) et la commande `open`, raccourcis globaux, barre des menus, lancement au démarrage.
+- **Tauri 2 + Rust** pour le cœur : raccourcis globaux, barre des menus, lancement au démarrage, et la capture propre à chaque système :
+  - **Mac** : AppleScript (`osascript`) et la commande `open` ;
+  - **Windows** : PowerShell pour la liste des apps et des dossiers de l'Explorateur, et quelques appels directs à Windows pour l'absence ;
+  - **Linux** : `/proc` et les raccourcis d'apps (`.desktop`), systemd-logind et GNOME pour l'absence ;
+  - **Windows et Linux** : les onglets sont lus dans les fichiers de session des navigateurs (Firefox, et le format « SNSS » de Chrome, Edge, Brave, Vivaldi, Opera).
 - **HTML, CSS et JavaScript** sans framework ni étape de compilation pour l'interface (dossier `src/`).
 - **Un fichier JSON** pour les données, écrit de façon atomique pour ne jamais rien perdre.
 
@@ -153,9 +184,14 @@ src/                 interface : fenêtre principale, fenêtre de sauvegarde, po
 design/styles/       les icônes du Dock de chaque habillage (SVG)
 src-tauri/src/
   lib.rs             démarrage, fenêtres, barre des menus, raccourcis, commandes
-  capture.rs         la photo du contexte
-  restore.rs         la remise en place
-  script.rs          les scripts AppleScript et la lecture de leurs réponses
+  platform.rs        le point d'entrée de tout ce qui dépend du système
+  capture.rs         la photo du contexte (Mac)
+  restore.rs         le plan de remise en place, et son exécution sur Mac
+  script.rs          les scripts AppleScript et la lecture de leurs réponses (Mac)
+  platform_windows.rs, platform_linux.rs   la capture et l'absence sur Windows et Linux
+  desktop.rs         la photo et la reprise communes à Windows et Linux
+  sessions.rs        la lecture des sessions des navigateurs (Windows et Linux)
+  sys.rs             petits outils (lancer un programme sans fenêtre noire…)
   store.rs           le stockage des contextes
   settings.rs        les réglages
   update.rs          la recherche de nouvelle version sur GitHub
@@ -168,8 +204,8 @@ Les tests du cœur se lancent avec `cargo test --manifest-path src-tauri/Cargo.t
 
 1. Change le numéro de version dans `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` et `package.json`.
 2. Ajoute une section pour cette version en haut de `CHANGELOG.md` : c'est ce texte qui s'affiche dans la fenêtre de mise à jour.
-3. Pousse un tag : `git tag v1.2.0 && git push origin v1.2.0`.
-4. GitHub Actions fabrique le `.dmg`, l'archive de mise à jour signée et `latest.json`, puis crée la Release. Les utilisateurs sont prévenus tout seuls.
+3. Pousse un tag : `git tag v1.5.0 && git push origin v1.5.0`.
+4. GitHub Actions fabrique, sur un Mac, un PC Windows et un PC Linux, les installateurs, les fichiers de mise à jour signés et `latest.json`, puis crée la Release. Les utilisateurs sont prévenus tout seuls.
 
 ### Comment marchent les mises à jour
 
@@ -179,7 +215,8 @@ Chaque Release contient un fichier `latest.json` qui annonce la dernière versio
 
 ## Idées pour la suite
 
-- Les onglets de Firefox, lus dans son fichier de session.
+- Les onglets de Firefox sur Mac, lus dans son fichier de session (comme sur Windows et Linux).
+- La place des fenêtres et « Faire place nette » sur Windows et Linux.
 - Le Terminal et VS Code rouverts dans le bon dossier.
 - Une mini-liste de prochaines étapes à cocher sur le post-it.
 - Une corbeille : un contexte supprimé reste 30 jours.

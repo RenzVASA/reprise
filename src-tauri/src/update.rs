@@ -1,10 +1,10 @@
 //! Recherche de nouvelle version sur GitHub (Releases du dépôt RenzVASA/reprise).
-//! On passe par `curl`, présent sur tous les Mac : pas besoin d'ajouter une bibliothèque réseau.
+//! On passe par `curl`, présent sur Mac, sur Windows 10/11 et sur Linux : pas besoin d'ajouter
+//! une bibliothèque réseau.
 //! Rien n'est installé automatiquement : on propose juste d'ouvrir la page de téléchargement.
 
 use crate::model::version_is_newer;
 use serde::Serialize;
-use std::process::Command;
 
 pub const REPO: &str = "RenzVASA/reprise";
 
@@ -25,7 +25,8 @@ pub struct UpdateInfo {
 
 pub fn check(current: &str) -> Result<UpdateInfo, String> {
     let api = format!("https://api.github.com/repos/{REPO}/releases/latest");
-    let out = Command::new("/usr/bin/curl")
+    let curl = if cfg!(target_os = "macos") { "/usr/bin/curl" } else { "curl" };
+    let out = crate::sys::command(curl)
         .args([
             "-sSL",
             "--max-time",
@@ -54,6 +55,17 @@ pub fn check(current: &str) -> Result<UpdateInfo, String> {
     parse_release(body, current)
 }
 
+/// Le fichier d'installation qui correspond à ce système.
+fn installer_ext() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "-setup.exe"
+    } else if cfg!(target_os = "linux") {
+        ".AppImage"
+    } else {
+        ".dmg"
+    }
+}
+
 pub fn parse_release(json: &str, current: &str) -> Result<UpdateInfo, String> {
     let v: serde_json::Value = serde_json::from_str(json).map_err(|_| "Réponse de GitHub illisible.".to_string())?;
     let latest = v["tag_name"].as_str().unwrap_or("").trim().to_string();
@@ -69,7 +81,7 @@ pub fn parse_release(json: &str, current: &str) -> Result<UpdateInfo, String> {
         assets
             .iter()
             .filter_map(|a| a["browser_download_url"].as_str())
-            .find(|u| u.ends_with(".dmg") && u.starts_with("https://github.com/"))
+            .find(|u| u.ends_with(installer_ext()) && u.starts_with("https://github.com/"))
             .map(String::from)
     });
     let notes = v["body"].as_str().unwrap_or("").chars().take(2000).collect();

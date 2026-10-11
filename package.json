@@ -1,6 +1,6 @@
 {
   "name": "reprise",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "Sauvegarde ton contexte de travail en un raccourci, reprends-le en un clic.",
   "license": "MIT",

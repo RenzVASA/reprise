@@ -4,9 +4,20 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+#[cfg(target_os = "macos")]
 pub const DEFAULT_SAVE_SHORTCUT: &str = "Alt+Command+S";
+#[cfg(target_os = "macos")]
 pub const DEFAULT_OPEN_SHORTCUT: &str = "Alt+Command+R";
+#[cfg(target_os = "macos")]
 pub const DEFAULT_RESUME_SHORTCUT: &str = "Alt+Shift+Command+R";
+
+// Windows et Linux : la touche Windows est déjà très prise, on passe par Ctrl+Alt.
+#[cfg(not(target_os = "macos"))]
+pub const DEFAULT_SAVE_SHORTCUT: &str = "Ctrl+Alt+S";
+#[cfg(not(target_os = "macos"))]
+pub const DEFAULT_OPEN_SHORTCUT: &str = "Ctrl+Alt+R";
+#[cfg(not(target_os = "macos"))]
+pub const DEFAULT_RESUME_SHORTCUT: &str = "Ctrl+Alt+Shift+R";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
